@@ -214,6 +214,9 @@ class Package(CMakePackageBase):
             self.scriptname = self.sourceDir() / "admin/win/disk-ragrad.nsi"
             self.defines["ragrad_win_dir"] = str(self.sourceDir() / "admin/win")
             self.defines["ragrad_app_id"] = "ru.ragrad.disk.desktop"
+            # версия для сведений о файле установщика — ровно четыре числа (4.0.1 → 4.0.1.0)
+            nums = [int(n) for n in re.findall(r"\d+", self.openCloudVersion(False) or "")][:4]
+            self.defines["ragrad_vi_version"] = ".".join(str(n) for n in nums + [0] * (4 - len(nums)))
             # отображаемое имя (заголовки, ярлык, «Приложения»); внутреннее — productname (папка программы, реестр)
             self.defines["ragrad_display_name"] = "Диск"
 

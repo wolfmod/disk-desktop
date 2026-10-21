@@ -126,6 +126,16 @@ ragrad_end_kill:
 
 !insertmacro MUI_LANGUAGE "Russian"
 
+; сведения о файле (Свойства → Подробно): название, версия и издатель; по ним служба подписи сверяет установщик
+VIProductVersion "@{ragrad_vi_version}"
+VIFileVersion "@{ragrad_vi_version}"
+VIAddVersionKey /LANG=${LANG_RUSSIAN} "ProductName" "@{productname}"
+VIAddVersionKey /LANG=${LANG_RUSSIAN} "ProductVersion" "@{version}"
+VIAddVersionKey /LANG=${LANG_RUSSIAN} "FileVersion" "@{version}"
+VIAddVersionKey /LANG=${LANG_RUSSIAN} "FileDescription" "Установка программы «@{ragrad_display_name}»"
+VIAddVersionKey /LANG=${LANG_RUSSIAN} "CompanyName" "@{company}"
+VIAddVersionKey /LANG=${LANG_RUSSIAN} "LegalCopyright" "© @{company}"
+
 Var RagradCloud
 
 Function RagradWelcomeShow

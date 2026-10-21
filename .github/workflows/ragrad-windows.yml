@@ -87,6 +87,8 @@ jobs:
           Установщик «Диск» для Windows (клиент синхронизации файлового хранилища ООО «Ра Град»).
           Скачайте DiskSetup-${{ github.ref_name }}.exe и запустите. Контрольная сумма SHA-256 — в файле .sha256.
 
+          Code signing policy: ${{ github.server_url }}/${{ github.repository }}#code-signing-policy
+
     - name: Хвост лога при ошибке
       if: failure()
       run: |
