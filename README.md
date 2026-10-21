@@ -22,16 +22,7 @@ Windows 10 and 11, 64-bit.
 
 Installers are built by GitHub Actions ([`ragrad-windows.yml`](.github/workflows/ragrad-windows.yml)) with [KDE Craft](https://community.kde.org/Craft), using the recipe in [`admin/craft/ragrad/disk-desktop`](admin/craft/ragrad/disk-desktop) and the NSIS script [`admin/win/disk-ragrad.nsi`](admin/win/disk-ragrad.nsi). A push to `ragrad` produces a test build (workflow artifact), a `v*` tag produces a release.
 
-## Code signing policy
-
-Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
-
-- Signed files: the Windows installer `DiskSetup-<version>.exe`, built from this repository by the GitHub Actions workflow above on GitHub-hosted runners. Third-party libraries in the installer (Qt, KDE Frameworks, OpenSSL and others) are included as provided by KDE Craft.
-- Committers and reviewers: [wolfmod](https://github.com/wolfmod)
-- Approvers: [wolfmod](https://github.com/wolfmod)
-- Every release is approved manually before it is signed.
-
-### Privacy policy
+## Privacy policy
 
 This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
 

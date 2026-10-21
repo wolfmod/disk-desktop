@@ -126,7 +126,7 @@ ragrad_end_kill:
 
 !insertmacro MUI_LANGUAGE "Russian"
 
-; сведения о файле (Свойства → Подробно): название, версия и издатель; по ним служба подписи сверяет установщик
+; сведения о файле (Свойства → Подробно): название, версия и издатель
 VIProductVersion "@{ragrad_vi_version}"
 VIFileVersion "@{ragrad_vi_version}"
 VIAddVersionKey /LANG=${LANG_RUSSIAN} "ProductName" "@{productname}"
