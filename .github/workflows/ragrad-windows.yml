@@ -1,0 +1,94 @@
+# Диск Ра Град: сборка установщика для Windows (KDE Craft + рецепт ragrad/disk-desktop + NSIS).
+# Отправка в ветку ragrad — проверочная сборка (установщик в артефактах), тег v* — релиз с установщиком.
+name: Диск для Windows
+
+on:
+  push:
+    branches: [ragrad]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: ragrad-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  windows:
+    name: Установщик Windows
+    runs-on: windows-2022
+    timeout-minutes: 240
+    env:
+      CRAFT_TARGET: windows-cl-msvc2022-x86_64
+      CRAFT: ${{ github.workspace }}/.github/workflows/.craft-ragrad.ps1
+
+    steps:
+    - name: Исходники
+      uses: actions/checkout@v7
+
+    - name: CraftMaster
+      run: git clone --depth=1 https://github.com/KDE/craftmaster.git "${home}/craft/CraftMaster/CraftMaster"
+
+    - name: Настройка Craft
+      run: |
+        New-Item -Path ~/cache -ItemType Directory -ErrorAction SilentlyContinue
+        git config --global --add safe.directory '*'
+        & $env:CRAFT --setup; if ($LASTEXITCODE) { exit 1 }
+        & $env:CRAFT -c --unshelve "${env:GITHUB_WORKSPACE}/.craft.shelf"; if ($LASTEXITCODE) { exit 1 }
+        & $env:CRAFT -c craft; if ($LASTEXITCODE) { exit 1 }
+
+    - name: Подготовка
+      run: |
+        & $env:CRAFT -c --set "srcDir=${env:GITHUB_WORKSPACE}" ragrad/disk-desktop; if ($LASTEXITCODE) { exit 1 }
+        & $env:CRAFT -c --set "buildNumber=${{ github.run_number }}" ragrad/disk-desktop; if ($LASTEXITCODE) { exit 1 }
+        & $env:CRAFT -c dev-utils/nsis; if ($LASTEXITCODE) { exit 1 }
+
+    - name: Зависимости
+      run: |
+        & $env:CRAFT -c --install-deps ragrad/disk-desktop; if ($LASTEXITCODE) { exit 1 }
+
+    - name: Сборка
+      run: |
+        & $env:CRAFT -c --no-cache ragrad/disk-desktop; if ($LASTEXITCODE) { exit 1 }
+
+    - name: Установщик
+      run: |
+        & $env:CRAFT -c --no-cache --package ragrad/disk-desktop; if ($LASTEXITCODE) { exit 1 }
+        New-Item -ItemType Directory dist | Out-Null
+        $exe = Get-ChildItem "${home}/craft/binaries/*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
+        $name = if ("${{ github.ref_type }}" -eq "tag") { "DiskSetup-${{ github.ref_name }}.exe" } else { "DiskSetup-build${{ github.run_number }}.exe" }
+        Copy-Item $exe.FullName "dist/$name"
+        $hash = (Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLower()
+        "$hash  $name" | Out-File -Encoding ascii "dist/$name.sha256"
+        Get-ChildItem dist | Format-Table Name, Length
+
+    - name: Артефакт
+      uses: actions/upload-artifact@v7
+      with:
+        name: DiskSetup-${{ github.run_number }}
+        path: dist/*
+
+    - name: Релиз
+      if: github.ref_type == 'tag'
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Диск для Windows ${{ github.ref_name }}
+        files: dist/*
+        body: |
+          Установщик «Диск» для Windows (клиент синхронизации файлового хранилища ООО «Ра Град»).
+          Скачайте DiskSetup-${{ github.ref_name }}.exe и запустите. Контрольная сумма SHA-256 — в файле .sha256.
+
+    - name: Хвост лога при ошибке
+      if: failure()
+      run: |
+        $log = "${env:RUNNER_TEMP}/craft.log"
+        if (Test-Path $log) {
+          $lines = Get-Content $log -Tail 80 | ForEach-Object { $_ -replace '%', '%25' -replace "`r", '' }
+          Write-Output ("::error title=Ошибка сборки — последние строки лога::" + ($lines -join '%0A'))
+        }
