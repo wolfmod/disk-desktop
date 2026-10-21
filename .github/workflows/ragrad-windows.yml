@@ -67,6 +67,9 @@ jobs:
         $hash = (Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLower()
         "$hash  $name" | Out-File -Encoding ascii "dist/$name.sha256"
         Get-ChildItem dist | Format-Table Name, Length
+        # имя, размер и SHA-256 — в открытую пометку сборки (её видно без входа в GitHub)
+        $size = (Get-Item "dist/$name").Length
+        Write-Output "::notice title=Установщик::$name — $size байт — SHA-256 $hash"
 
     - name: Артефакт
       uses: actions/upload-artifact@v7
