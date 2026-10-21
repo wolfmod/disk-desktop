@@ -30,7 +30,7 @@ class AccountSettings;
 class Application;
 class FolderMan;
 class ActivitySettings;
-class GeneralSettings;
+class RagradSettingsPage;
 
 /**
  * @brief The SettingsDialog class
@@ -43,6 +43,7 @@ class SettingsDialog : public QMainWindow
     Q_PROPERTY(Account *currentAccount READ currentAccount WRITE setCurrentAccount NOTIFY currentAccountChanged)
     QML_ELEMENT
     QML_UNCREATABLE("C++ only")
+    Q_MOC_INCLUDE("gui/accountsettings.h")
     OC_DECLARE_WIDGET_FOCUS
 public:
     enum class SettingsPage { None, Activity, Settings, Account };
@@ -55,7 +56,8 @@ public:
     void requestModality(Account *account);
     void ceaseModality(Account *account);
 
-    AccountSettings *accountSettings(Account *account) const;
+    // Диск Ра Град: доступно из шапки окна (меню сотрудника: выйти, отключить компьютер)
+    Q_INVOKABLE AccountSettings *accountSettings(Account *account) const;
 
     SettingsPage currentPage() const;
 
@@ -86,7 +88,7 @@ private:
     ActivitySettings *_activitySettings;
     QList<Account *> _modalStack;
 
-    GeneralSettings *_generalSettings;
+    RagradSettingsPage *_generalSettings;
     SettingsPage _currentPage = SettingsPage::None;
     Account *_currentAccount = nullptr;
 };

@@ -14,6 +14,7 @@
 
 #include "setupwizardaccountbuilder.h"
 
+#include "gui/creds/apptokencredentials.h"
 #include "gui/guiutility.h"
 #include "networkjobs/fetchuserinfojobfactory.h"
 
@@ -57,6 +58,34 @@ const IdToken &OAuth2AuthenticationStrategy::idToken() const
     return _idToken;
 }
 
+void OAuth2AuthenticationStrategy::persist(const AccountPtr &account)
+{
+    OAuth::persist(account, _dynamicRegistrationData, _idToken);
+}
+
+AppTokenAuthenticationStrategy::AppTokenAuthenticationStrategy(const QString &userName, const QString &token, const QString &label)
+    : _userName(userName)
+    , _token(token)
+    , _label(label)
+{
+}
+
+AbstractCredentials *AppTokenAuthenticationStrategy::makeCreds()
+{
+    Q_ASSERT(isValid());
+    return new AppTokenCredentials(_userName, _token, _label);
+}
+
+bool AppTokenAuthenticationStrategy::isValid()
+{
+    return !_userName.isEmpty() && !_token.isEmpty();
+}
+
+FetchUserInfoJobFactory AppTokenAuthenticationStrategy::makeFetchUserInfoJobFactory(QNetworkAccessManager *nam)
+{
+    return FetchUserInfoJobFactory::fromBasicAuthCredentials(nam, _userName, _token);
+}
+
 SetupWizardAccountBuilder::SetupWizardAccountBuilder() = default;
 
 void SetupWizardAccountBuilder::setServerUrl(const QUrl &serverUrl)
@@ -90,7 +119,7 @@ AccountPtr SetupWizardAccountBuilder::build() const
     // TODO: perhaps _authenticationStrategy->setUpAccountPtr(...) would be more elegant? no need for getters then
     newAccountPtr->setCredentials(_authenticationStrategy->makeCreds());
     newAccountPtr->credentials()->persist();
-    OAuth::persist(newAccountPtr, _authenticationStrategy->dynamicRegistrationData(), _authenticationStrategy->idToken());
+    _authenticationStrategy->persist(newAccountPtr);
 
     newAccountPtr->setDavDisplayName(_displayName);
 
@@ -122,7 +151,7 @@ void SetupWizardAccountBuilder::setDisplayName(const QString &displayName)
     _displayName = displayName;
 }
 
-void SetupWizardAccountBuilder::setAuthenticationStrategy(std::unique_ptr<OAuth2AuthenticationStrategy> &&strategy)
+void SetupWizardAccountBuilder::setAuthenticationStrategy(std::unique_ptr<AbstractAuthenticationStrategy> &&strategy)
 {
     _authenticationStrategy = std::move(strategy);
 }
@@ -137,7 +166,7 @@ void SetupWizardAccountBuilder::clearCustomTrustedCaCertificates()
     _customTrustedCaCertificates.clear();
 }
 
-OAuth2AuthenticationStrategy *SetupWizardAccountBuilder::authenticationStrategy() const
+AbstractAuthenticationStrategy *SetupWizardAccountBuilder::authenticationStrategy() const
 {
     return _authenticationStrategy.get();
 }

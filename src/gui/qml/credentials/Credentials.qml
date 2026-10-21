@@ -72,29 +72,32 @@ Pane {
             Layout.alignment: Qt.AlignHCenter
             fillMode: Image.PreserveAspectFit
             source: OCUtils.resourcePath("jsontheme", "wizardLogo", true)
-            sourceSize.height: 128
-            sourceSize.width: 128
+            sourceSize.height: 112
+            sourceSize.width: 112
         }
 
-        Item {
-            Layout.fillHeight: true
-            Layout.maximumHeight: 64
-        }
-
+        // Диск Ра Град: вместо «Подключение к: <адрес сервера>» — название программы (при повторном входе — сотрудник);
+        // адрес сервера людям не нужен
         Label {
             Layout.fillWidth: true
-            text: credentials.isRefresh ? qsTr("Connecting %1 to:\n%2").arg(credentials.displayName).arg(credentials.host) : qsTr("Connecting to:\n%1").arg(credentials.host)
+            Layout.topMargin: 12
+            text: credentials.isRefresh ? credentials.displayName : JsonTheme.applicationDisplayName
             horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: credentials.isRefresh ? 17 : 26
+            font.weight: credentials.isRefresh ? Font.DemiBold : Font.Bold
+            elide: Text.ElideRight
         }
 
         Item {
             Layout.fillHeight: true
-            Layout.maximumHeight: 64
+            Layout.maximumHeight: 28
         }
 
         ColumnLayout {
             id: contentLayout
             Layout.alignment: Qt.AlignHCenter
+            // иначе колонка растягивается на всю ширину окна вслед за полями ввода
+            Layout.fillWidth: false
         }
 
         Item {

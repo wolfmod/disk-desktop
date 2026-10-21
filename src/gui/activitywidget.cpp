@@ -15,9 +15,9 @@
 #include "activitywidget.h"
 
 
+#include "gui/ragradactivitymodel.h"
 #include "issueswidget.h"
 #include "protocolwidget.h"
-#include "resources/fonticon.h"
 #include "theme.h"
 
 #include <QtGui>
@@ -26,6 +26,7 @@
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
+using namespace Qt::Literals::StringLiterals;
 
 
 namespace OCC {
@@ -33,31 +34,51 @@ namespace OCC {
 ActivitySettings::ActivitySettings(QWidget *parent)
     : QWidget(parent)
 {
-    QHBoxLayout *hbox = new QHBoxLayout(this);
-    setLayout(hbox);
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
 
-    // create a tab widget for the three activity views
-    _tab = new QTabWidget(this);
-    hbox->addWidget(_tab);
-
+    // Диск Ра Град: прежние таблицы — только источники данных (собирают действия и проблемы), на экран не выводятся
     _protocolWidget = new ProtocolWidget(this);
-    _tab->addTab(_protocolWidget, Resources::FontIcon(u''), tr("Local Activity"));
-
+    _protocolWidget->hide();
     _issuesWidget = new IssuesWidget(this);
-    const int issueTabId = _tab->addTab(_issuesWidget, Resources::FontIcon(u''), tr("Not Synced"));
-    connect(_issuesWidget, &IssuesWidget::issueCountUpdated, this, [issueTabId, this](int issueCount) {
-        QString cntText = tr("Not Synced");
-        if (issueCount) {
-            //: %1 is the number of not synced files.
-            cntText = tr("Not Synced (%1)").arg(issueCount);
+    _issuesWidget->hide();
+
+    _recentModel = new RagradActivityModel(_protocolWidget->model(), this);
+    _issuesModel = new RagradActivityModel(_issuesWidget->filteredModel(), this);
+
+    connect(_issuesWidget, &IssuesWidget::issueCountUpdated, this, [this](int issueCount) {
+        if (_issueCount != issueCount) {
+            _issueCount = issueCount;
+            Q_EMIT issueCountChanged();
         }
-        _tab->setTabText(issueTabId, cntText);
     });
+
+    _quickWidget = new QmlUtils::OCQuickWidget(this);
+    layout->addWidget(_quickWidget);
+    _quickWidget->setOCContext(QUrl(u"qrc:/qt/qml/eu/OpenCloud/gui/qml/ActivityPage.qml"_s), this);
+}
+
+QAbstractItemModel *ActivitySettings::recentModel() const
+{
+    return _recentModel;
+}
+
+QAbstractItemModel *ActivitySettings::issuesModel() const
+{
+    return _issuesModel;
+}
+
+void ActivitySettings::setCurrentTab(int tab)
+{
+    if (_currentTab != tab) {
+        _currentTab = tab;
+        Q_EMIT currentTabChanged();
+    }
 }
 
 void ActivitySettings::slotShowIssuesTab()
 {
-    _tab->setCurrentWidget(_issuesWidget);
+    setCurrentTab(1);
 }
 
 ActivitySettings::~ActivitySettings()

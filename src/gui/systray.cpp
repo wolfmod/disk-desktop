@@ -15,16 +15,24 @@
 #include "systray.h"
 
 #include "common/restartmanager.h"
+#include "common/utility.h"
 #include "gui/accountmanager.h"
 #include "gui/application.h"
+#include "gui/folder.h"
 #include "gui/folderman.h"
 #include "gui/networkinformation.h"
+#include "gui/openfilemanager.h"
+#include "gui/ragradsyncsummary.h"
+#include "gui/scheduling/syncscheduler.h"
+#include "gui/settingsdialog.h"
+#include "libsync/progressdispatcher.h"
 #include "libsync/theme.h"
 #include "resources/jsontheme.h"
 
 #include <QApplication>
 #include <QDesktopServices>
 #include <QMenu>
+#include <QScopeGuard>
 
 using namespace Qt::Literals::StringLiterals;
 
@@ -43,11 +51,26 @@ Systray::Systray(QObject *parent)
     connect(AccountManager::instance(), &AccountManager::accountAdded, this,
         [this](AccountStatePtr accountState) { connect(accountState.data(), &AccountState::stateChanged, this, &Systray::slotComputeOverallSyncStatus); });
     connect(FolderMan::instance(), &FolderMan::folderSyncStateChange, this, &Systray::slotComputeOverallSyncStatus);
+    // Диск Ра Град: общая пауза из меню трея останавливает планировщик — значок должен показать паузу
+    connect(FolderMan::instance()->scheduler(), &SyncScheduler::isRunningChanged, this, &Systray::slotComputeOverallSyncStatus);
+    connect(RagradSyncSummary::instance(), &RagradSyncSummary::changed, this, &Systray::updateStatusActions);
 
     // init systray
-    slotComputeOverallSyncStatus();
     computeContextMenu();
+    slotComputeOverallSyncStatus();
+    updateStatusActions();
     show();
+}
+
+void Systray::updateStatusActions()
+{
+    if (!_statusAction || !_speedAction) {
+        return;
+    }
+    const auto *summary = RagradSyncSummary::instance();
+    _statusAction->setText(summary->trayText());
+    _speedAction->setText(tr("Скорость: %1").arg(summary->speedText()));
+    _speedAction->setVisible(!summary->speedText().isEmpty());
 }
 
 void Systray::setToolTip(const QString &tip)
@@ -81,6 +104,10 @@ void Systray::slotComputeOverallSyncStatus()
         if (!f->isSyncPaused()) {
             allPaused = false;
         }
+    }
+    // Диск Ра Град: «Приостановить синхронизацию» в меню трея останавливает планировщик (папки при этом не на паузе)
+    if (!map.isEmpty() && !FolderMan::instance()->scheduler()->isRunning()) {
+        allPaused = true;
     }
 
     if (!problemAccounts.empty()) {
@@ -144,11 +171,41 @@ void Systray::computeContextMenu()
     Q_ASSERT(!contextMenu());
     auto *menu = new QMenu(Resources::JsonTheme::instance().applicationDisplayName());
 
-    menu->addAction(Resources::JsonTheme::instance().applicationIcon(), tr("Show %1").arg(Resources::JsonTheme::instance().applicationDisplayName()), ocApp(),
-        &Application::showSettings);
+    // Диск Ра Град: меню как у Яндекс.Диска — папка, сайт, состояние с процентом, пауза, настройки, закрыть
+    auto *openFolder = menu->addAction(Resources::JsonTheme::instance().applicationIcon(), tr("Открыть папку Диска"), this, [] {
+        for (const auto &accountState : AccountManager::instance()->accounts()) {
+            if (accountState->account()->hasDefaultSyncRoot()) {
+                showInFileManager(accountState->account()->defaultSyncRoot());
+                return;
+            }
+        }
+        ocApp()->showSettings();
+    });
+    menu->setDefaultAction(openFolder);
+    menu->addAction(tr("Открыть Диск в браузере"), this, [] {
+        const auto accounts = AccountManager::instance()->accounts();
+        if (accounts.isEmpty()) {
+            return;
+        }
+        // веб-Диск сотрудников — /app/ (стоковый веб OpenCloud у нас не используется)
+        QString url = accounts.first()->account()->url().toString();
+        if (!url.endsWith(QLatin1Char('/'))) {
+            url += QLatin1Char('/');
+        }
+        QDesktopServices::openUrl(QUrl(url + u"app/"_s));
+    });
+    menu->addAction(tr("Окно программы"), ocApp(), &Application::showSettings);
+
+    menu->addSeparator();
+    _statusAction = menu->addAction(QString());
+    _statusAction->setEnabled(false);
+    _speedAction = menu->addAction(QString());
+    _speedAction->setEnabled(false);
+    _speedAction->setVisible(false);
+
     auto *pauseResume = new QAction(menu);
     auto updatePauseResumeAction = [pauseResume] {
-        pauseResume->setText(FolderMan::instance()->scheduler()->isRunning() ? tr("Pause synchronizations") : tr("Resume synchronizations"));
+        pauseResume->setText(FolderMan::instance()->scheduler()->isRunning() ? tr("Приостановить синхронизацию") : tr("Возобновить синхронизацию"));
     };
     connect(pauseResume, &QAction::triggered, FolderMan::instance()->scheduler(), [] {
         if (FolderMan::instance()->scheduler()->isRunning()) {
@@ -186,15 +243,11 @@ void Systray::computeContextMenu()
 
     menu->addSeparator();
 
-    if (!Theme::instance()->helpUrl().isEmpty()) {
-        menu->addAction(tr("Help"), this, [] { QDesktopServices::openUrl(Theme::instance()->helpUrl()); });
-    }
-
-    menu->addAction(tr("About"), ocApp(), &Application::showAbout);
-
-    // this action will be hidden on mac and be part of the application menu
-    menu->addAction(tr("About Qt"), qApp, &QApplication::aboutQt)->setMenuRole(QAction::AboutQtRole);
-
+    // Диск Ра Град: «Помощь», «Описание», «О Qt» сотруднику не нужны (сведения о версии — в окне «Настройки»)
+    menu->addAction(tr("Настройки"), ocApp(), [] {
+        ocApp()->settingsDialog()->setCurrentPage(SettingsDialog::SettingsPage::Settings);
+        ocApp()->showSettings();
+    });
     menu->addAction(tr("Quit"), ocApp(), &QApplication::quit);
 
     setContextMenu(menu);

@@ -30,6 +30,7 @@
 #include "gui/newwizard/setupwizardcontroller.h"
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
+#include "gui/ragradspaces.h"
 #include "gui/systray.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/vfs/vfs.h"
@@ -50,6 +51,7 @@
 
 #include <QApplication>
 #include <QDesktopServices>
+#include <QDir>
 #include <QMenuBar>
 
 using namespace Qt::Literals::StringLiterals;
@@ -61,39 +63,24 @@ namespace {
 
 void setUpInitialSyncFolder(AccountStatePtr accountStatePtr, bool useVfs)
 {
-    // saves a bit of duplicate code
-    auto addFolder = [accountStatePtr, useVfs](const QString &localFolder, const QUrl &davUrl, const QString &spaceId = {}, const QString &displayName = {}) {
-        auto def = FolderDefinition{accountStatePtr->account()->uuid(), davUrl, spaceId, displayName};
-        def.setLocalPath(localFolder);
-        return FolderMan::instance()->addFolderFromWizard(accountStatePtr, std::move(def), useVfs);
-    };
-
     auto finalize = [accountStatePtr] {
         accountStatePtr->checkConnectivity();
         FolderMan::instance()->setSyncEnabled(true);
         FolderMan::instance()->scheduleAllFolders();
     };
 
+    // Диск Ра Град: вместо «каждый раздел подпапкой по имени» — раскладка как в мобильном приложении (gui/ragradspaces.h):
+    // только «Объекты» (или папки, открытые по годам, внутри «Объектов»), без личного пространства.
     QObject::connect(
         accountStatePtr->account()->spacesManager(), &GraphApi::SpacesManager::ready, accountStatePtr,
-        [accountStatePtr, addFolder, finalize] {
-            auto spaces = accountStatePtr->account()->spacesManager()->spaces();
-            // we do not want to set up folder sync connections for disabled spaces (#10173)
-            spaces.erase(std::remove_if(spaces.begin(), spaces.end(), [](auto *space) { return space->disabled(); }), spaces.end());
-
-            if (!spaces.isEmpty()) {
-                const QString localDir(accountStatePtr->account()->defaultSyncRoot());
-                FileSystem::setFolderMinimumPermissions(localDir);
-                Utility::setupFavLink(localDir);
-                for (const auto *space : spaces) {
-                    const QString name = space->displayName();
-                    const QString folderName = FolderMan::instance()->findGoodPathForNewSyncFolder(
-                        localDir, name, FolderMan::NewFolderType::SpacesFolder, accountStatePtr->account()->uuid());
-                    auto folder = addFolder(folderName, QUrl(space->drive().getRoot().getWebDavUrl()), space->drive().getRoot().getId(), name);
-                    folder->setPriority(space->priority());
-                }
-                finalize();
-            }
+        [accountStatePtr, useVfs, finalize] {
+            const QString localDir(accountStatePtr->account()->defaultSyncRoot());
+            QDir().mkpath(localDir);
+            FileSystem::setFolderMinimumPermissions(localDir);
+            Utility::setupFavLink(localDir);
+            Ragrad::connectSpaces(accountStatePtr, useVfs);
+            // разделов может ещё не быть (доступ дадут позже) — синхронизацию включаем всё равно, новые подключит watchSpaces
+            finalize();
         },
         Qt::SingleShotConnection);
     accountStatePtr->account()->spacesManager()->checkReady();
@@ -199,6 +186,10 @@ void Application::slotAccountStateAdded(AccountStatePtr accountState) const
     connect(accountState.data(), &AccountState::isConnectedChanged, FolderMan::instance(), &FolderMan::slotIsConnectedChanged);
     connect(accountState->account().data(), &Account::serverVersionChanged, FolderMan::instance(),
         [account = accountState->account().data()] { FolderMan::instance()->slotServerVersionChanged(account); });
+
+    // Диск Ра Град: новые разделы (дали доступ позже) подключаются сами
+    Ragrad::watchSpaces(accountState);
+
     accountState->checkConnectivity();
 }
 

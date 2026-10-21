@@ -14,6 +14,7 @@
 
 #include "gui/qmlutils.h"
 
+#include "common/version.h"
 #include "gui/fonticonmessagebox.h"
 #include "gui/openfilemanager.h"
 #include "resources/resources.h"
@@ -89,6 +90,11 @@ bool OCC::QmlUtils::OCQuickWidget::event(QEvent *event)
 QString OCC::QmlUtils::OCUtils::qVersion() const
 {
     return QString::fromUtf8(::qVersion());
+}
+
+QString OCC::QmlUtils::OCUtils::appVersion() const
+{
+    return OCC::Version::version().toString();
 }
 
 QUrl OCC::QmlUtils::OCUtils::resourcePath(const QString &theme, const QString &icon, bool enabled, int size, const QColor &color)

@@ -14,6 +14,7 @@
 
 #include "qmlcredentials.h"
 
+#include "creds/apptokenlogin.h"
 #include "libsync/theme.h"
 
 #include <QClipboard>
@@ -73,4 +74,67 @@ bool QmlOAuthCredentials::isReady() const
 bool QmlOAuthCredentials::isValid() const
 {
     return _oauth;
+}
+
+QmlAppTokenCredentials::QmlAppTokenCredentials(
+    QNetworkAccessManager *nam, const QUrl &host, const QString &displayName, const QString &userName, QObject *parent)
+    : QmlCredentials(host, displayName, parent)
+    , _login(new AppTokenLogin(nam, host, this))
+    , _userName(userName)
+{
+    connect(_login, &AppTokenLogin::succeeded, this, [this](const QString &user, const QString &token, const QString &label) {
+        setBusy(false);
+        Q_EMIT loggedIn(user, token, label);
+    });
+    connect(_login, &AppTokenLogin::failed, this, [this](const QString &message) {
+        setBusy(false);
+        setErrorMessage(message);
+    });
+}
+
+void QmlAppTokenCredentials::login(const QString &login, const QString &password)
+{
+    if (_busy) {
+        return;
+    }
+    setErrorMessage({});
+    setBusy(true);
+    // при повторном входе логин уже внутренний — шаг «телефон/почта -> логин» не нужен
+    if (_userName.isEmpty()) {
+        _login->start(login, password, true);
+    } else {
+        _login->start(_userName, password, false);
+    }
+}
+
+bool QmlAppTokenCredentials::isReady() const
+{
+    return !_busy;
+}
+
+QString QmlAppTokenCredentials::errorMessage() const
+{
+    return _errorMessage;
+}
+
+bool QmlAppTokenCredentials::busy() const
+{
+    return _busy;
+}
+
+void QmlAppTokenCredentials::setBusy(bool busy)
+{
+    if (_busy != busy) {
+        _busy = busy;
+        Q_EMIT busyChanged();
+        Q_EMIT readyChanged();
+    }
+}
+
+void QmlAppTokenCredentials::setErrorMessage(const QString &message)
+{
+    if (_errorMessage != message) {
+        _errorMessage = message;
+        Q_EMIT errorMessageChanged();
+    }
 }

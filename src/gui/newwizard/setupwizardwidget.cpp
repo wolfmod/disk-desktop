@@ -6,6 +6,7 @@
 #include "gui/fonticonmessagebox.h"
 #include "gui/guiutility.h"
 #include "gui/settingsdialog.h"
+#include "libsync/globalconfig.h"
 #include "resources/jsontheme.h"
 #include "resources/template.h"
 #include "theme.h"
@@ -118,6 +119,12 @@ void SetupWizardWidget::displayPage(AbstractSetupWizardPage *page, SetupWizardSt
 
     // initial check whether to enable the next button right away
     slotUpdateNextButton();
+
+    // Диск Ра Град: адрес сервера зашит, остальные шаги проходятся сами — листать нечего,
+    // вход идёт кнопкой «Войти» на странице; «Назад»/«Далее» только сбивают с толку
+    const bool fixedServer = GlobalConfig::serverUrl().isValid();
+    _ui->backButton->setVisible(!fixedServer);
+    _ui->nextButton->setVisible(!fixedServer);
 
     _ui->navigation->setActiveState(state);
     _ui->navigation->setEnabled(true);

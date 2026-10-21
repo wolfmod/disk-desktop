@@ -41,6 +41,9 @@ public:
     explicit IssuesWidget(QWidget *parent = nullptr);
     ~IssuesWidget() override;
 
+    // Диск Ра Град: данные для страницы «Активность» (QML) — проблемы с тем же отбором по статусам, сам виджет не показывается
+    QAbstractItemModel *filteredModel() const;
+
 public Q_SLOTS:
     void slotProgressInfo(Folder *folder, const ProgressInfo &progress);
     void slotItemCompleted(Folder *folder, const SyncFileItemPtr &item);

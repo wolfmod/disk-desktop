@@ -67,6 +67,14 @@ target_sources(OpenCloudGui PRIVATE
     translations.cpp
     creds/httpcredentialsgui.cpp
     creds/qmlcredentials.cpp
+    creds/apptokenlogin.cpp
+    creds/apptokencredentials.cpp
+    ragradspaces.cpp
+    ragradsyncsummary.cpp
+    ragradsettingspage.cpp
+    ragradactivitymodel.cpp
+    ragradtexts.cpp
+    ragradservicedialogs.cpp
     updateurldialog.cpp
     updatenotifier.cpp
 
@@ -111,11 +119,20 @@ ecm_add_qml_module(OpenCloudGui
             qml/AccountButton.qml
             qml/FolderDelegate.qml
             qml/FolderError.qml
+            qml/RagradButton.qml
+            qml/SettingsPage.qml
+            qml/ActivityPage.qml
+            qml/RagradSection.qml
+            qml/RagradDivider.qml
+            qml/RagradToggleRow.qml
+            qml/IgnoredFilesPage.qml
+            qml/LogSettingsPage.qml
 
             qml/UpdateUrlDialog.qml
 
             qml/credentials/Credentials.qml
             qml/credentials/OAuthCredentials.qml
+            qml/credentials/AppTokenCredentials.qml
 
             spaces/qml/SpaceDelegate.qml
             spaces/qml/SpacesView.qml

@@ -97,10 +97,12 @@ FolderMan::FolderMan()
         // set the metadata for a sync root, depending on the number of accounts
         for (const auto &accountStatePtr : AccountManager::instance()->accounts()) {
             if (accountStatePtr->account()->hasDefaultSyncRoot()) {
+                // Диск Ра Град: подпись папки в Проводнике (desktop.ini LocalizedResourcename) — отображаемое имя «Диск»,
+                // внутреннее имя людям не показываем
                 Folder::prepareFolder(accountStatePtr->account()->defaultSyncRoot(),
                     AccountManager::instance()->accounts().size() == 1
-                        ? Resources::JsonTheme::instance().applicationName()
-                        : u"%1 - %2"_s.arg(Resources::JsonTheme::instance().applicationName(), accountStatePtr->account()->davDisplayName()),
+                        ? Resources::JsonTheme::instance().applicationDisplayName()
+                        : u"%1 - %2"_s.arg(Resources::JsonTheme::instance().applicationDisplayName(), accountStatePtr->account()->davDisplayName()),
                     accountStatePtr->account()->davDisplayName(), true);
             }
         }
@@ -751,7 +753,10 @@ Folder *FolderMan::addFolderFromFolderWizardResult(const AccountStatePtr &accoun
 
 QString FolderMan::suggestSyncFolder(NewFolderType folderType, const QUuid &accountUuid)
 {
-    return FolderMan::instance()->findGoodPathForNewSyncFolder(QDir::homePath(), Resources::JsonTheme::instance().applicationName(), folderType, accountUuid);
+    // Диск Ра Град: общая папка сотрудника называется отображаемым именем — C:\Users\<имя>\Диск
+    // (внутреннее имя остаётся только у настроек и связки ключей; у уже настроенных компьютеров путь не меняется)
+    return FolderMan::instance()->findGoodPathForNewSyncFolder(
+        QDir::homePath(), Resources::JsonTheme::instance().applicationDisplayName(), folderType, accountUuid);
 }
 
 bool FolderMan::prepareFolder(const QString &folder)

@@ -20,10 +20,10 @@
 #include "activitywidget.h"
 #include "application.h"
 #include "configfile.h"
-#include "generalsettings.h"
 #include "gui/folderman.h"
 #include "gui/fonticonmessagebox.h"
 #include "gui/qmlutils.h"
+#include "gui/ragradsettingspage.h"
 #include "resources/jsontheme.h"
 #include "resources/qmlresources.h"
 #include "resources/resources.h"
@@ -114,8 +114,8 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     // People perceive this as a Window, so also make Ctrl+W work
     addAction(tr("Hide"), Qt::CTRL | Qt::Key_W, this, &SettingsDialog::hide);
 
-    // TODO: fix sizing
-    _ui->quickWidget->setFixedHeight(minimumHeight() * 0.13);
+    // Диск Ра Град: шапка как в мобильном «Диске» — облако, «Диск», Активность, Настройки, сотрудник
+    _ui->quickWidget->setFixedHeight(64);
     _ui->quickWidget->engine()->addImageProvider(QStringLiteral("avatar"), new AvatarImageProvider);
     _ui->quickWidget->setOCContext(QUrl(QStringLiteral("qrc:/qt/qml/eu/OpenCloud/gui/qml/AccountBar.qml")), this);
     connect(
@@ -137,9 +137,10 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     _activitySettings = new ActivitySettings;
     _ui->stack->addWidget(_activitySettings);
 
-    _generalSettings = new GeneralSettings;
+    // Диск Ра Град: страница «Настройки» в стиле мобильного «Диска» (QML) вместо формы GeneralSettings
+    _generalSettings = new RagradSettingsPage;
     _ui->stack->addWidget(_generalSettings);
-    connect(_generalSettings, &GeneralSettings::syncOptionsChanged, FolderMan::instance(), &FolderMan::slotReloadSyncOptions);
+    connect(_generalSettings, &RagradSettingsPage::syncOptionsChanged, FolderMan::instance(), &FolderMan::slotReloadSyncOptions);
 
     ConfigFile().restoreGeometry(this);
 #ifdef Q_OS_MAC

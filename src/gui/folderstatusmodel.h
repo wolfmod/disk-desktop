@@ -55,7 +55,12 @@ public:
         Priority,
         Quota,
         FolderStatusIcon,
-        Folder
+        Folder,
+        // Диск Ра Град: короткий статус справа в строке папки («Синхронизировано», «37%»…) и его вид для цвета
+        StatusChipText,
+        StatusChipKind,
+        // полный путь папки на компьютере (с обратными косыми, как в Проводнике)
+        LocalPath
     };
     Q_ENUMS(Roles)
 

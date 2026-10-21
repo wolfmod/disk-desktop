@@ -11,6 +11,9 @@ target_sources(OpenCloudGui PRIVATE
     pages/oauthcredentialssetupwizardpage.h
     pages/oauthcredentialssetupwizardpage.cpp
 
+    pages/apptokencredentialssetupwizardpage.h
+    pages/apptokencredentialssetupwizardpage.cpp
+
     pages/accountconfiguredwizardpage.ui
     pages/accountconfiguredwizardpage.h
     pages/accountconfiguredwizardpage.cpp
@@ -39,6 +42,7 @@ target_sources(OpenCloudGui PRIVATE
     states/abstractsetupwizardstate.cpp
     states/serverurlsetupwizardstate.cpp
     states/oauthcredentialssetupwizardstate.cpp
+    states/apptokencredentialssetupwizardstate.cpp
     states/accountconfiguredsetupwizardstate.cpp
 
     setupwizardcontext.cpp

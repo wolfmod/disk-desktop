@@ -53,6 +53,11 @@ if(BETA_CHANNEL_BUILD)
     if(APPLE)
         list(APPEND OPENCLOUD_BUNDLED_RESOURCES "${CMAKE_CURRENT_BINARY_DIR}/bin/opencloud_theme.json")
     endif()
+else()
+    # Диск Ра Град: системная тема (название, значок, адрес сервера cloud.ra-grad.ru, цвета мастера).
+    # Клиент читает её из opencloud_theme.json рядом с программой (JsonTheme::loadSystemTheme).
+    configure_file("${PROJECT_SOURCE_DIR}/ragrad.json" "${CMAKE_CURRENT_BINARY_DIR}/bin/opencloud_theme.json" COPYONLY)
+    install(FILES "${PROJECT_SOURCE_DIR}/ragrad.json" DESTINATION ${KDE_INSTALL_BINDIR} RENAME opencloud_theme.json)
 endif()
 
 option( WITH_CRASHREPORTER "Build crashreporter" OFF )

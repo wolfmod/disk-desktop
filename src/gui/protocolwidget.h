@@ -49,6 +49,9 @@ public:
         const QModelIndexList &items, const QPoint &pos);
     static QMenu *showFilterMenu(QWidget *parent, Models::SignalledQSortFilterProxyModel *model, int role, const QString &columnName);
 
+    // Диск Ра Град: данные для страницы «Активность» (QML), сам виджет не показывается
+    ProtocolItemModel *model() const { return _model; }
+
 public Q_SLOTS:
     void slotItemCompleted(Folder *folder, const SyncFileItemPtr &item);
     void filterDidChange();

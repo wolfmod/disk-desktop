@@ -21,18 +21,37 @@
 
 namespace OCC::Wizard {
 
-class OAuth2AuthenticationStrategy
+/**
+ * Диск Ра Град: общий интерфейс способа входа — апстримный OAuth2 и наш «логин + ключ устройства».
+ */
+class AbstractAuthenticationStrategy
+{
+public:
+    virtual ~AbstractAuthenticationStrategy() = default;
+
+    virtual AbstractCredentials *makeCreds() = 0;
+
+    virtual bool isValid() = 0;
+
+    virtual FetchUserInfoJobFactory makeFetchUserInfoJobFactory(QNetworkAccessManager *nam) = 0;
+
+    /// сохранить в новом аккаунте данные способа входа (OAuth — регистрацию клиента и id-токен)
+    virtual void persist(const AccountPtr &account) { Q_UNUSED(account) }
+};
+
+class OAuth2AuthenticationStrategy : public AbstractAuthenticationStrategy
 {
 public:
     explicit OAuth2AuthenticationStrategy(
         const QString &token, const QString &refreshToken, const QVariantMap &dynamicRegistrationData, const IdToken &idToken);
 
-    HttpCredentialsGui *makeCreds();
+    HttpCredentialsGui *makeCreds() override;
 
-    bool isValid();
+    bool isValid() override;
 
-    FetchUserInfoJobFactory makeFetchUserInfoJobFactory(QNetworkAccessManager *nam);
+    FetchUserInfoJobFactory makeFetchUserInfoJobFactory(QNetworkAccessManager *nam) override;
 
+    void persist(const AccountPtr &account) override;
 
     const QVariantMap &dynamicRegistrationData() const;
     const IdToken &idToken() const;
@@ -44,6 +63,26 @@ private:
 
     const QVariantMap _dynamicRegistrationData;
     const IdToken _idToken;
+};
+
+/**
+ * Диск Ра Град: вход по логину сотрудника и ключу устройства (Basic), см. gui/creds/apptokencredentials.h.
+ */
+class AppTokenAuthenticationStrategy : public AbstractAuthenticationStrategy
+{
+public:
+    AppTokenAuthenticationStrategy(const QString &userName, const QString &token, const QString &label);
+
+    AbstractCredentials *makeCreds() override;
+
+    bool isValid() override;
+
+    FetchUserInfoJobFactory makeFetchUserInfoJobFactory(QNetworkAccessManager *nam) override;
+
+private:
+    QString _userName;
+    QString _token;
+    QString _label;
 };
 
 /**
@@ -62,8 +101,8 @@ public:
     void setServerUrl(const QUrl &serverUrl);
     QUrl serverUrl() const;
 
-    void setAuthenticationStrategy(std::unique_ptr<OAuth2AuthenticationStrategy> &&strategy);
-    OAuth2AuthenticationStrategy *authenticationStrategy() const;
+    void setAuthenticationStrategy(std::unique_ptr<AbstractAuthenticationStrategy> &&strategy);
+    AbstractAuthenticationStrategy *authenticationStrategy() const;
 
     /**
      * Check whether credentials passed to the builder so far can be used to create a new account object.
@@ -107,7 +146,7 @@ private:
     QVector<QUrl> _webFingerInstances;
     QUrl _webFingerSelectedInstance;
 
-    std::unique_ptr<OAuth2AuthenticationStrategy> _authenticationStrategy;
+    std::unique_ptr<AbstractAuthenticationStrategy> _authenticationStrategy;
 
     QString _displayName;
 

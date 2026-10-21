@@ -310,6 +310,13 @@ void Folder::prepareFolder(const QString &path, const QString &displayName, cons
 
 QString Folder::displayName() const
 {
+    // Диск Ра Град: имя папки на компьютере («Объекты», «Открытые мне» — раскладка gui/ragradspaces) — его же
+    // человек видит в Проводнике; имя раздела на сервере («Ра Град · Объекты») — только запасное.
+    // Берём с самой папки, а не из сохранённых настроек — так старые записи исправляются сами.
+    const QString localName = QDir(path()).dirName();
+    if (!localName.isEmpty()) {
+        return localName;
+    }
     if (auto *s = space()) {
         return s->displayName();
     }

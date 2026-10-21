@@ -65,12 +65,15 @@ class OCUtils : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString qVersion READ qVersion CONSTANT)
+    // Диск Ра Град: версия программы для подвала главного окна («4.0.1»)
+    Q_PROPERTY(QString appVersion READ appVersion CONSTANT)
     QML_SINGLETON
     QML_ELEMENT
 public:
     using QObject::QObject;
 
     QString qVersion() const;
+    QString appVersion() const;
 
     Q_INVOKABLE int compareQVersion(int major, int minor, int patch) const;
 

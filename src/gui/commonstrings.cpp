@@ -20,7 +20,8 @@ using namespace OCC;
 QString CommonStrings::fileBrowser()
 {
 #ifdef Q_OS_WIN
-    return QStringLiteral("Explorer");
+    // Диск Ра Град: переводимое — в русском «Открыть в Проводнике» (перевод дан в предложном падеже)
+    return tr("Explorer");
 #elif defined(Q_OS_MAC)
     return QStringLiteral("Finder");
 #else

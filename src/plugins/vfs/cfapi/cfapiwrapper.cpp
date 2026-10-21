@@ -362,7 +362,8 @@ void OCC::CfApiWrapper::registerSyncRoot(const VfsSetupParams &params, const std
                 info.Path(result.GetResults());
 
                 // displayed when an error occurs "Make sure OpenCloud is running on your PC, try again." and in the trash bin etc.
-                const QString displayname = u"%1: %2"_s.arg(params.providerName, params.folderDisplayName());
+                // Диск Ра Град: людям — отображаемое имя («Диск: Объекты»), внутреннее остаётся только в Id
+                const QString displayname = u"%1: %2"_s.arg(params.providerDisplayName, params.folderDisplayName());
                 info.DisplayNameResource(reinterpret_cast<const wchar_t *>(displayname.utf16()));
 
                 info.IconResource(reinterpret_cast<const wchar_t *>(iconPath.utf16()));
@@ -374,8 +375,13 @@ void OCC::CfApiWrapper::registerSyncRoot(const VfsSetupParams &params, const std
                 info.Version(reinterpret_cast<const wchar_t *>(version.utf16()));
                 info.AllowPinning(true);
                 info.ShowSiblingsAsGroup(true);
-                winrt::Uri uri(reinterpret_cast<const wchar_t *>(
-                    u"%1/files/trash/project?fileId=%2"_s.arg(params.account->url().toString(QUrl::FullyEncoded), params.spaceId()).utf16()));
+                // Диск Ра Град: стоковый веб OpenCloud у нас не используется — корзина в браузере = наш веб-Диск /app/
+                QString webDisk = params.account->url().toString(QUrl::FullyEncoded);
+                if (!webDisk.endsWith(u'/')) {
+                    webDisk += u'/';
+                }
+                const QString recycleBinUrl = webDisk + u"app/"_s;
+                winrt::Uri uri(reinterpret_cast<const wchar_t *>(recycleBinUrl.utf16()));
                 info.RecycleBinUri(uri);
 
                 winrt::Streams::DataWriter streamWriter;

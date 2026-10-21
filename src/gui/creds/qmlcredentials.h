@@ -18,6 +18,8 @@
 
 #include <QtQmlIntegration/QtQmlIntegration>
 
+class QNetworkAccessManager;
+
 namespace OCC {
 
 class QmlCredentials : public QObject
@@ -81,5 +83,45 @@ Q_SIGNALS:
 private:
     QPointer<OAuth> _oauth = nullptr;
     bool _ready = false;
+};
+
+class AppTokenLogin;
+
+/**
+ * Диск Ра Град: форма входа «логин + пароль» (мастер и повторный вход).
+ * userName пустой — мастер (вводится телефон, почта или логин);
+ * задан — повторный вход, спрашивается только пароль.
+ */
+class QmlAppTokenCredentials : public QmlCredentials
+{
+    Q_OBJECT
+    Q_PROPERTY(QString userName MEMBER _userName CONSTANT FINAL)
+    Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged FINAL)
+    Q_PROPERTY(bool busy READ busy NOTIFY busyChanged FINAL)
+    QML_ELEMENT
+    QML_UNCREATABLE("C++ only")
+
+public:
+    QmlAppTokenCredentials(QNetworkAccessManager *nam, const QUrl &host, const QString &displayName, const QString &userName = {}, QObject *parent = nullptr);
+
+    Q_INVOKABLE void login(const QString &login, const QString &password);
+
+    bool isReady() const override;
+    QString errorMessage() const;
+    bool busy() const;
+
+Q_SIGNALS:
+    void loggedIn(const QString &userName, const QString &token, const QString &label);
+    void errorMessageChanged();
+    void busyChanged();
+
+private:
+    void setBusy(bool busy);
+    void setErrorMessage(const QString &message);
+
+    AppTokenLogin *_login;
+    QString _userName;
+    QString _errorMessage;
+    bool _busy = false;
 };
 }

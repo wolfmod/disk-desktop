@@ -24,7 +24,7 @@
     <message>
         <location filename="../src/gui/qml/AccountBar.qml" line="192"/>
         <source>Quit</source>
-        <translation>Выйти</translation>
+        <translation>Закрыть</translation>
     </message>
 </context>
 <context>
@@ -165,13 +165,13 @@ File synchronization desktop utility.</source>
     <message>
         <location filename="../src/gui/qml/credentials/Credentials.qml" line="48"/>
         <source>Stay logged out</source>
-        <translation>Оставаться не авторизованным</translation>
+        <translation>Не входить</translation>
     </message>
     <message>
         <location filename="../src/gui/qml/credentials/Credentials.qml" line="86"/>
         <source>Connecting %1 to:
 %2</source>
-        <translation>Подключение %1 к:
+        <translation>%1
 %2</translation>
     </message>
     <message>
@@ -216,17 +216,17 @@ File synchronization desktop utility.</source>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="72"/>
         <source>Manage Account</source>
-        <translation>Управление аккаунтом</translation>
+        <translation>Аккаунт</translation>
     </message>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="82"/>
         <source>Log in</source>
-        <translation>Войти</translation>
+        <translation>Войти в аккаунт</translation>
     </message>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="82"/>
         <source>Log out</source>
-        <translation>Выйти</translation>
+        <translation>Выйти из аккаунта</translation>
     </message>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="86"/>
@@ -236,7 +236,7 @@ File synchronization desktop utility.</source>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="102"/>
         <source>Remove</source>
-        <translation>Удалить</translation>
+        <translation>Отключить этот компьютер</translation>
     </message>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="109"/>
@@ -251,7 +251,7 @@ File synchronization desktop utility.</source>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="363"/>
         <source>Force sync now</source>
-        <translation>Принудительная синхронизация прямо сейчас</translation>
+        <translation>Синхронизировать сейчас</translation>
     </message>
     <message>
         <location filename="../src/gui/qml/FolderDelegate.qml" line="371"/>
@@ -520,7 +520,7 @@ File synchronization desktop utility.</source>
     <message>
         <location filename="../src/libsync/abstractnetworkjob.cpp" line="247"/>
         <source>Connection timed out</source>
-        <translation>Время ожидания соединения истекло</translation>
+        <translation>сервер долго не отвечает</translation>
     </message>
     <message>
         <location filename="../src/libsync/abstractnetworkjob.cpp" line="249"/>
@@ -640,7 +640,7 @@ File synchronization desktop utility.</source>
     <message>
         <location filename="../src/gui/accountsettings.cpp" line="363"/>
         <source>Signed out</source>
-        <translation>Произведен выход из системы</translation>
+        <translation>Вы вышли из аккаунта</translation>
     </message>
     <message>
         <location filename="../src/gui/accountsettings.cpp" line="367"/>
@@ -660,22 +660,22 @@ File synchronization desktop utility.</source>
     <message>
         <location filename="../src/gui/accountsettings.cpp" line="375"/>
         <source>Disconnected</source>
-        <translation>Disconnected</translation>
+        <translation>Нет соединения</translation>
     </message>
     <message>
         <location filename="../src/gui/accountsettings.cpp" line="496"/>
         <source>Confirm Account Removal</source>
-        <translation>Подтвердите удаление аккаунта</translation>
+        <translation>Отключение компьютера</translation>
     </message>
     <message>
         <location filename="../src/gui/accountsettings.cpp" line="497"/>
         <source>&lt;p&gt;Do you really want to remove the connection to the account %1«?&lt;/p&gt;&lt;p&gt;&lt;b&gt;Note:&lt;/b&gt; This will &lt;b&gt;not&lt;/b&gt; delete any files.&lt;/p&gt;</source>
-        <translation>&lt;p&gt;Вы действительно хотите удалить подключение к аккаунту %1«?&lt;/p&gt;&lt;p&gt;&lt;b&gt;Примечание:&lt;/b&gt; Это &lt;b&gt;не&lt;/b&gt; приведет к удалению файлов.&lt;/p&gt;</translation>
+        <translation>&lt;p&gt;Отключить этот компьютер от аккаунта «%1»?&lt;/p&gt;&lt;p&gt;&lt;b&gt;Файлы на компьютере останутся&lt;/b&gt;, синхронизация прекратится.&lt;/p&gt;</translation>
     </message>
     <message>
         <location filename="../src/gui/accountsettings.cpp" line="501"/>
         <source>Remove connection</source>
-        <translation>Удалить подключение</translation>
+        <translation>Отключить</translation>
     </message>
     <message>
         <location filename="../src/gui/accountsettings.cpp" line="352"/>
@@ -730,7 +730,7 @@ The update will be performed in the background, and overwrite the current AppIma
     <message>
         <location filename="../src/gui/main.cpp" line="175"/>
         <source>Quit</source>
-        <translation>Выйти</translation>
+        <translation>Закрыть</translation>
     </message>
     <message>
         <location filename="../src/gui/application.cpp" line="189"/>
@@ -769,6 +769,10 @@ The update will be performed in the background, and overwrite the current AppIma
 <context>
     <name>OCC::CommonStrings</name>
     <message>
+        <source>Explorer</source>
+        <translation>Проводнике</translation>
+    </message>
+    <message>
         <location filename="../src/gui/commonstrings.cpp" line="27"/>
         <source>file manager</source>
         <translation>менеджер файлов</translation>
@@ -781,17 +785,17 @@ The update will be performed in the background, and overwrite the current AppIma
     <message>
         <location filename="../src/gui/commonstrings.cpp" line="39"/>
         <source>Show in %1</source>
-        <translation>Показать в %1</translation>
+        <translation>Открыть в %1</translation>
     </message>
     <message>
         <location filename="../src/gui/commonstrings.cpp" line="41"/>
         <source>Show »%1« in %2</source>
-        <translation>Показать »%1« в %2</translation>
+        <translation>Открыть «%1» в %2</translation>
     </message>
     <message>
         <location filename="../src/gui/commonstrings.cpp" line="46"/>
         <source>Show in web browser</source>
-        <translation>Показать в веб браузере</translation>
+        <translation>Открыть в браузере</translation>
     </message>
     <message>
         <location filename="../src/gui/commonstrings.cpp" line="51"/>
@@ -1172,7 +1176,7 @@ This means that the synchronization client might not upload local changes immedi
     <message>
         <location filename="../src/libsync/networkjobs/getfilejob.cpp" line="27"/>
         <source>Connection Timeout</source>
-        <translation>Время ожидания соединения истекло</translation>
+        <translation>сервер долго не отвечает</translation>
     </message>
     <message>
         <location filename="../src/libsync/networkjobs/getfilejob.cpp" line="122"/>
@@ -1885,7 +1889,7 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/libsync/discovery.cpp" line="1255"/>
         <source>Server replied with an error while reading directory »%1«: %2</source>
-        <translation>Сервер ответил ошибкой при попытке прочесть папку »%1«: %2</translation>
+        <translation>не удалось получить с сервера содержимое папки «%1» (%2)</translation>
     </message>
     <message>
         <location filename="../src/libsync/discovery.cpp" line="1045"/>
@@ -2377,12 +2381,12 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/gui/settingsdialog.cpp" line="125"/>
         <source>Quit %1</source>
-        <translation>Выйти из %1</translation>
+        <translation>Закрыть «%1»</translation>
     </message>
     <message>
         <location filename="../src/gui/settingsdialog.cpp" line="126"/>
         <source>Are you sure you want to quit %1?</source>
-        <translation>ВЫ уверены, что хотите выйти из %1?</translation>
+        <translation>Закрыть программу «%1»? Синхронизация остановится до следующего запуска.</translation>
     </message>
     <message>
         <location filename="../src/gui/settingsdialog.cpp" line="152"/>
@@ -2401,7 +2405,7 @@ Note that using any logging command line options will override the settings.</so
         <location filename="../src/gui/socketapi/socketapi.cpp" line="507"/>
         <source>Share with %1</source>
         <comment>parameter is OpenCloud</comment>
-        <translation>Предоставить совместный доступ для %1</translation>
+        <translation>Поделиться через %1</translation>
     </message>
     <message>
         <location filename="../src/gui/socketapi/socketapi.cpp" line="605"/>
@@ -2521,7 +2525,7 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/libsync/syncengine.cpp" line="154"/>
         <source>%1 (skipped due to earlier error, trying again in %2)</source>
-        <translation>%1 (пропущено из-за возникшей ранее ошибки, новая попытка - %2)</translation>
+        <translation>%1 (Диск повторит попытку через %2)</translation>
     </message>
     <message>
         <location filename="../src/libsync/syncengine.cpp" line="326"/>
@@ -2567,7 +2571,7 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/libsync/syncengine.cpp" line="751"/>
         <source>Aborted due to: %1</source>
-        <translation>Прервано из-за: %1</translation>
+        <translation>Синхронизация прервалась, Диск повторит её сам. Причина: %1</translation>
     </message>
 </context>
 <context>
@@ -2653,7 +2657,7 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/gui/systray.cpp" line="198"/>
         <source>Quit</source>
-        <translation>Выйти</translation>
+        <translation>Закрыть</translation>
     </message>
 </context>
 <context>
@@ -2846,7 +2850,7 @@ Note that using any logging command line options will override the settings.</so
         <location filename="../src/gui/newwizard/pages/serverurlsetupwizardpage.cpp" line="68"/>
         <source>%1 logo</source>
         <extracomment>This is the accessibility text for the logo in the setup wizard page. The parameter is the name for the (branded) application.</extracomment>
-        <translation>%1 лого</translation>
+        <translation>Логотип: %1</translation>
     </message>
 </context>
 <context>
@@ -2994,7 +2998,7 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/libsync/discoveryremoteinfo.cpp" line="69"/>
         <source>server reported no %1</source>
-        <translation>сервер сообщил об отсутствии %1</translation>
+        <translation>сервер прислал неполные сведения о файле (нет: %1)</translation>
     </message>
 </context>
 <context>
@@ -3066,7 +3070,7 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/gui/newwizard/setupwizardwidget.ui" line="14"/>
         <source>Add New Account</source>
-        <translation>Добавить Нового Пользователя</translation>
+        <translation>Вход</translation>
     </message>
     <message>
         <location filename="../src/gui/newwizard/setupwizardwidget.ui" line="101"/>
@@ -3291,7 +3295,7 @@ Note that using any logging command line options will override the settings.</so
     <message>
         <location filename="../src/libsync/platform_win.cpp" line="114"/>
         <source>Shutting down %1</source>
-        <translation>Выключение %1</translation>
+        <translation>Завершение работы: %1</translation>
     </message>
 </context>
 <context>

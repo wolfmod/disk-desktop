@@ -71,6 +71,8 @@ class OPENCLOUD_SYNC_EXPORT Account : public QObject
     Q_PROPERTY(bool hasAvatar READ hasAvatar NOTIFY avatarChanged)
     Q_PROPERTY(QGradient::Preset avatarGradient READ avatarGradient NOTIFY displayNameChanged)
     Q_PROPERTY(QUrl url READ url NOTIFY urlChanged)
+    // Диск Ра Град: общая папка «Диск Ра Град» — для кнопки «Открыть папку» в окне аккаунта
+    Q_PROPERTY(QString defaultSyncRoot READ defaultSyncRoot CONSTANT)
     QML_ELEMENT
     QML_UNCREATABLE("Only created in the C++ code")
 

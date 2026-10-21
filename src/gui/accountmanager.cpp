@@ -17,6 +17,7 @@
 #include "configfile.h"
 #include "creds/credentialmanager.h"
 #include "guiutility.h"
+#include <creds/apptokencredentials.h>
 #include <creds/httpcredentialsgui.h>
 #include <theme.h>
 
@@ -114,7 +115,8 @@ bool AccountManager::restore()
         acc->setCapabilities({acc->url(), capabilities});
         acc->setDefaultSyncRoot(settings.value(defaultSyncRootC()).toString());
 
-        acc->setCredentials(new HttpCredentialsGui);
+        // Диск Ра Град: вход только по логину и ключу устройства (см. creds/apptokencredentials.h)
+        acc->setCredentials(new AppTokenCredentials);
 
         // now the server cert
         const auto certs = QSslCertificate::fromData(settings.value(caCertsKeyC()).toByteArray());

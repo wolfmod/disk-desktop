@@ -17,11 +17,16 @@
 #include "libsync/accountfwd.h"
 #include "theme.h"
 
+#include <QHash>
+#include <QPointer>
 #include <QSystemTrayIcon>
 
+class QAction;
 class QIcon;
 
 namespace OCC {
+class Folder;
+class ProgressInfo;
 /**
  * @brief The Systray class
  * @ingroup gui
@@ -42,6 +47,13 @@ private:
     void slotComputeOverallSyncStatus();
 
     void computeContextMenu();
+
+    // Диск Ра Град: строка состояния в меню (как у Яндекс.Диска) — «Синхронизировано» / «Синхронизация: 37%» и скорость;
+    // тексты — из RagradSyncSummary (тот же источник, что у главного окна)
+    void updateStatusActions();
+
+    QPointer<QAction> _statusAction;
+    QPointer<QAction> _speedAction;
 };
 
 } // namespace OCC

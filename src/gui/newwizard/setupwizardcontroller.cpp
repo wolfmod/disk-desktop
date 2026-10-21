@@ -2,12 +2,15 @@
 
 #include "gui/application.h"
 #include "gui/folderman.h"
+#include "libsync/globalconfig.h"
 #include "pages/accountconfiguredwizardpage.h"
 #include "states/abstractsetupwizardstate.h"
 #include "states/accountconfiguredsetupwizardstate.h"
-#include "states/oauthcredentialssetupwizardstate.h"
+#include "states/apptokencredentialssetupwizardstate.h"
 #include "states/serverurlsetupwizardstate.h"
 #include "theme.h"
+
+#include <QTimer>
 
 using namespace std::chrono_literals;
 
@@ -19,22 +22,29 @@ using namespace OCC::Wizard;
 using namespace SetupWizardControllerPrivate;
 
 /**
+ * Диск Ра Град: адрес сервера зашит в теме (serverUrl). Тогда шаги «адрес сервера» и «настройка синхронизации»
+ * проходятся сами (папка «Диск Ра Град», файлы по запросу), видимым остаётся только вход — навигация не нужна.
+ */
+bool serverUrlIsFixed()
+{
+    return GlobalConfig::serverUrl().isValid();
+}
+
+/**
  * Generate list of wizard states to put in the navigation.
  * The actual wizard may be in states not within this list to perform tasks in the background without user interaction
  * (e.g., to detect the authentication method the server uses).
  */
 QList<SetupWizardState> getNavigationEntries()
 {
-    QList<SetupWizardState> states = {
-        SetupWizardState::ServerUrlState
-    };
-
-    states.append({
+    if (serverUrlIsFixed()) {
+        return {};
+    }
+    return {
+        SetupWizardState::ServerUrlState,
         SetupWizardState::CredentialsState,
         SetupWizardState::AccountConfiguredState,
-    });
-
-    return states;
+    };
 }
 
 }
@@ -102,7 +112,8 @@ void SetupWizardController::changeStateTo(SetupWizardState nextState, ChangeReas
         break;
     }
     case SetupWizardState::CredentialsState:
-        _currentState = new OAuthCredentialsSetupWizardState(_context, reason == ChangeReason::EvaluationFailed);
+        // Диск Ра Град: вместо OAuth — логин и пароль с обменом на ключ устройства
+        _currentState = new AppTokenCredentialsSetupWizardState(_context);
         break;
     case SetupWizardState::AccountConfiguredState: {
         _currentState = new AccountConfiguredSetupWizardState(_context);
@@ -188,6 +199,20 @@ void SetupWizardController::changeStateTo(SetupWizardState nextState, ChangeReas
     });
 
     _context->window()->displayPage(_currentState->page(), _currentState->state());
+
+    // Диск Ра Град: адрес зашит — проверяем сервер сразу, без нажатия «Далее»; после входа так же сразу
+    // завершаем настройку (папка «Диск Ра Град» по умолчанию, файлы по запросу) — без экрана «Тонкая настройка».
+    // При ошибке страница остаётся с текстом ошибки (у последнего шага — с открытыми настройками папки), «Далее» повторяет.
+    const bool autoState = _currentState->state() == SetupWizardState::ServerUrlState || _currentState->state() == SetupWizardState::AccountConfiguredState;
+    if (autoState && serverUrlIsFixed() && reason == ChangeReason::Default) {
+        AbstractSetupWizardState *state = _currentState.data();
+        QTimer::singleShot(0, state, [this, state] {
+            if (_currentState.data() == state) {
+                _context->window()->slotStartTransition();
+                state->evaluatePage();
+            }
+        });
+    }
 }
 
 SetupWizardController::~SetupWizardController() noexcept { }

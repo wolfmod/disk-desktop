@@ -33,6 +33,7 @@
 #include "gui/networkinformation.h"
 #include "gui/notifications/systemnotificationmanager.h"
 #include "gui/qmlutils.h"
+#include "gui/ragradspaces.h"
 #include "gui/selectivesyncwidget.h"
 #include "gui/spaces/spaceimageprovider.h"
 #include "gui/updateurldialog.h"
@@ -69,8 +70,12 @@ AccountSettings::AccountSettings(const AccountStatePtr &accountState, QWidget *p
 
     auto weightedModel = new QSortFilterProxyModel(this);
     weightedModel->setSourceModel(_model);
-    weightedModel->setSortRole(static_cast<int>(FolderStatusModel::Roles::Priority));
-    weightedModel->sort(0, Qt::DescendingOrder);
+    // Диск Ра Град: папки по алфавиту, как в Проводнике («Объекты», «Открытые мне»);
+    // приоритет папки хранится в настройках и задаёт только очерёдность синхронизации
+    weightedModel->setSortRole(static_cast<int>(FolderStatusModel::Roles::DisplayName));
+    weightedModel->setSortLocaleAware(true);
+    weightedModel->setSortCaseSensitivity(Qt::CaseInsensitive);
+    weightedModel->sort(0, Qt::AscendingOrder);
 
     _sortModel = weightedModel;
 
@@ -496,7 +501,8 @@ void AccountSettings::slotDeleteAccount()
     auto messageBox = new FontIconMessageBox({Resources::FontIcon::DefaultGlyphes::Question}, tr("Confirm Account Removal"),
         tr("<p>Do you really want to remove the connection to the account %1«?</p>"
            "<p><b>Note:</b> This will <b>not</b> delete any files.</p>")
-            .arg(_accountState->account()->displayNameWithHost()),
+            // Диск Ра Град: только имя сотрудника — без служебного «@адрес-сервера»
+            .arg(_accountState->account()->davDisplayName()),
         QMessageBox::NoButton, this);
     auto yesButton = messageBox->addButton(tr("Remove connection"), QMessageBox::YesRole);
     messageBox->addButton(tr("Cancel"), QMessageBox::NoRole);
@@ -510,7 +516,11 @@ void AccountSettings::slotDeleteAccount()
                 // the message is usually not user visible
                 FolderMan::instance()->scheduler()->terminateCurrentSync(u"Account about to be removed"_s);
             }
+            // Диск Ра Град: после отключения общая папка остаётся (файлы не удаляются), но без подписи «Диск»,
+            // иначе Проводник показывает её как второй «Диск» рядом с новой
+            const QString syncRoot = _accountState->account()->hasDefaultSyncRoot() ? _accountState->account()->defaultSyncRoot() : QString();
             manager->deleteAccount(_accountState);
+            Ragrad::clearFolderLabel(syncRoot);
         }
     });
     messageBox->open();

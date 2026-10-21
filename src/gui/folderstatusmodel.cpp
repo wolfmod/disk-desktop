@@ -17,12 +17,14 @@
 #include "accountstate.h"
 #include "folderman.h"
 #include "gui/networkinformation.h"
+#include "gui/ragradtexts.h"
 #include "theme.h"
 
 #include "libsync/graphapi/space.h"
 #include "libsync/graphapi/spacesmanager.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QFileIconProvider>
 #include <QRandomGenerator>
 
@@ -253,16 +255,42 @@ QVariant FolderStatusModel::data(const QModelIndex &index, int role) const
         if (f->syncResult().hasUnresolvedConflicts()) {
             errors.append(tr("There are unresolved conflicts."));
         }
-        return errors;
+        // Диск Ра Град: технические фразы движка и сети — понятным языком
+        return Ragrad::humanizeErrors(errors);
     };
 
     auto getDescription = [f] {
-        if (auto *space = f->space()) {
-            if (!space->drive().getDescription().isEmpty()) {
-                return space->drive().getDescription();
-            }
-        }
+        // Диск Ра Град: сотруднику важно, где папка на компьютере, а не служебное описание раздела («Диск/Ра Град/Объекты»)
         return tr("Local folder: %1").arg(f->shortGuiLocalPath());
+    };
+
+    // Диск Ра Град: короткий статус справа в строке папки; вид — для цвета: ok / sync / paused / offline / error / wait
+    auto getStatusChip = [f, &folderInfo]() -> std::pair<QString, QString> {
+        const auto status = f->syncResult().status();
+        if (!f->accountState()->isConnected()) {
+            return {tr("Нет соединения"), QStringLiteral("offline")};
+        }
+        if (f->isSyncPaused()) {
+            return {tr("Приостановлено"), QStringLiteral("paused")};
+        }
+        if (f->isSyncRunning() || status == SyncResult::SyncRunning) {
+            const int percent = qRound(folderInfo->_progress._overallPercent);
+            return {percent > 0 ? QStringLiteral("%1%").arg(percent) : tr("Проверка…"), QStringLiteral("sync")};
+        }
+        switch (status) {
+        case SyncResult::Success:
+        case SyncResult::Problem:
+            return {tr("Синхронизировано"), QStringLiteral("ok")};
+        case SyncResult::Error:
+        case SyncResult::SetupError:
+            return {tr("Ошибка"), QStringLiteral("error")};
+        case SyncResult::Paused:
+            return {tr("Приостановлено"), QStringLiteral("paused")};
+        case SyncResult::Offline:
+            return {tr("Нет соединения"), QStringLiteral("offline")};
+        default:
+            return {tr("Ожидание"), QStringLiteral("wait")};
+        }
     };
 
     switch (static_cast<Roles>(role)) {
@@ -300,6 +328,12 @@ QVariant FolderStatusModel::data(const QModelIndex &index, int role) const
     }
     case Roles::Folder:
         return QVariant::fromValue(f);
+    case Roles::StatusChipText:
+        return getStatusChip().first;
+    case Roles::StatusChipKind:
+        return getStatusChip().second;
+    case Roles::LocalPath:
+        return QDir::toNativeSeparators(f->cleanPath());
     case Roles::AccessibleDescriptionRole: {
         QStringList desc = {f->displayName(), Utility::enumToDisplayName(f->syncResult().status())};
         desc << getErrors();
@@ -340,6 +374,9 @@ QHash<int, QByteArray> FolderStatusModel::roleNames() const
         {static_cast<int>(Roles::Quota), "quota"},
         {static_cast<int>(Roles::Folder), "folder"},
         {static_cast<int>(Roles::AccessibleDescriptionRole), "accessibleDescription"},
+        {static_cast<int>(Roles::StatusChipText), "statusChipText"},
+        {static_cast<int>(Roles::StatusChipKind), "statusChipKind"},
+        {static_cast<int>(Roles::LocalPath), "localPath"},
     };
 }
 

@@ -256,6 +256,11 @@ IssuesWidget::~IssuesWidget()
     delete _ui;
 }
 
+QAbstractItemModel *IssuesWidget::filteredModel() const
+{
+    return _statusSortModel;
+}
+
 QMenu *IssuesWidget::showFilterMenu(QWidget *parent)
 {
     auto menu = new QMenu(parent);
