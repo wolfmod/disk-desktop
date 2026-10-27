@@ -144,7 +144,8 @@ void Logger::open(const QString &name)
 {
     bool openSucceeded = false;
     QIODevice::OpenMode flags = QIODevice::WriteOnly;
-    auto encoding = QStringConverter::Utf16;
+    // Диск Ра Град: UTF-8 вместо UTF-16 — журнал вдвое меньше
+    auto encoding = QStringConverter::Utf8;
     if (_doFileFlush) {
         flags |= QIODevice::Unbuffered;
     }
@@ -279,7 +280,13 @@ static bool compressLog(const QString &originalName, const QString &targetName)
     QFile original(originalName);
     if (!original.open(QIODevice::ReadOnly))
         return false;
+    // Диск Ра Град: узкий gzopen на Windows не открывает путь с кириллицей («%TEMP%\Диск Ра Град-logdir»),
+    // файлы журнала оставались несжатыми и не удалялись — открываем по широкому пути
+#ifdef Q_OS_WIN
+    auto compressed = gzopen_w(reinterpret_cast<const wchar_t *>(targetName.utf16()), "wb");
+#else
     auto compressed = gzopen(targetName.toUtf8().constData(), "wb");
+#endif
     if (!compressed) {
         return false;
     }
@@ -340,7 +347,10 @@ void Logger::rotateLog()
 
             // Expire old log files and deal with conflicts
             {
-                auto oldLogFiles = dir.entryList(QStringList(QStringLiteral("*%1-*.log.gz").arg(qApp->applicationName())), QDir::Files, QDir::Name);
+                // Диск Ра Град: и несжатые (если сжать не удалось), иначе они копятся без ограничения
+                auto oldLogFiles =
+                    dir.entryList({QStringLiteral("*%1-*.log.gz").arg(qApp->applicationName()), QStringLiteral("*%1-*.log").arg(qApp->applicationName())},
+                        QDir::Files, QDir::Name);
 
                 // keeping the last maxLogFiles files in total (need to subtract one from maxLogFiles to ensure the limit)
                 std::sort(oldLogFiles.begin(), oldLogFiles.end(), std::greater<QString>());
