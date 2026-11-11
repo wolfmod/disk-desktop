@@ -26,7 +26,10 @@ UpdateNotifier::UpdateNotifier(QObject *parent)
 
 void UpdateNotifier::checkForUpdates(const AccountPtr &account)
 {
-    if (Version::withUpdateNotification()) {
+    // Диск Ра Град 4.0.7: проверка выпусков исходного проекта (update.opencloud.eu) выключена — она предлагала бы
+    // чужую программу без наших настроек. Обновления — своим механизмом (RagradUpdater, файл версии на сервере Диска).
+    Q_UNUSED(account)
+    if (false) {
         if (!_checkedForUpdate) {
             _checkedForUpdate = true;
             auto *job = new JsonJob(account, account->url(), u"config.json"_s, "GET"_ba, this);

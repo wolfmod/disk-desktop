@@ -15,6 +15,7 @@
 #include "gui/ragradupdater.h"
 
 #include "gui/application.h"
+#include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
 #include "libsync/common/version.h"
 #include "resources/fonticon.h"
@@ -179,8 +180,18 @@ void RagradUpdater::setReady(const QString &version, const QString &file)
     Q_EMIT changed();
     qCInfo(lcRagradUpdater) << u"готово обновление" << version << file;
     if (firstTime) {
-        ocApp()->systemNotificationManager()->notify({tr("Доступна новая версия Диска"),
-            tr("Версия %1 загружена. Откройте окно Диска и нажмите «Обновить».").arg(version), Resources::FontIcon(u'')});
+        // 4.0.7: в уведомлении Windows — кнопка «Обновить» (как «Отметить прочитанным» у уведомлений Диска)
+        const QString button = tr("Обновить");
+        SystemNotificationRequest request(tr("Доступна новая версия Диска"),
+            tr("Версия %1 загружена. Нажмите «Обновить» — откроется установка новой версии.").arg(version), Resources::FontIcon(u''));
+        request.setButtons({button});
+        if (auto *n = ocApp()->systemNotificationManager()->notify(std::move(request))) {
+            connect(n, &SystemNotification::buttonClicked, this, [this, button](const QString &clicked) {
+                if (clicked == button) {
+                    installNow();
+                }
+            });
+        }
     }
 }
 
