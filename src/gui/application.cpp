@@ -31,6 +31,7 @@
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
 #include "gui/ragradspaces.h"
+#include "gui/ragradupdater.h"
 #include "gui/systray.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/vfs/vfs.h"
@@ -189,6 +190,8 @@ void Application::slotAccountStateAdded(AccountStatePtr accountState) const
 
     // Диск Ра Град: новые разделы (дали доступ позже) подключаются сами
     Ragrad::watchSpaces(accountState);
+    // Диск Ра Град 4.0.4: своё автообновление (файл версии на сервере Диска)
+    RagradUpdater::instance()->start();
 
     accountState->checkConnectivity();
 }

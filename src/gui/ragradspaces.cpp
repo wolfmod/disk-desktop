@@ -19,6 +19,7 @@
 #include "gui/folderman.h"
 #include "libsync/account.h"
 #include "libsync/graphapi/spacesmanager.h"
+#include "libsync/networkjobs/jsonjob.h"
 #include "libsync/vfs/vfs.h"
 
 #include <QDir>
@@ -27,7 +28,9 @@
 #include <QFileInfo>
 #include <QHash>
 #include <QLoggingCategory>
+#include <QPointer>
 #include <QRegularExpression>
+#include <QTimer>
 #include <QUrl>
 
 #ifdef Q_OS_WIN
@@ -35,6 +38,7 @@
 #endif
 
 using namespace Qt::Literals::StringLiterals;
+using namespace std::chrono_literals;
 
 namespace OCC::Ragrad {
 
@@ -255,6 +259,38 @@ void clearFolderLabel(const QString &path)
 #else
     Q_UNUSED(path)
 #endif
+}
+
+namespace {
+    void lookupActorAttempt(const AccountPtr &account, const QString &spaceId, const QString &relPath, QPointer<QObject> context,
+        std::function<void(const QString &)> done, int attempt)
+    {
+        auto *job = new JsonJob(account, account->url(), u"disk-auth/actor"_s, "GET", SimpleNetworkJob::UrlQuery{{u"space"_s, spaceId}, {u"path"_s, relPath}},
+            QNetworkRequest{}, nullptr);
+        job->setTimeout(15s);
+        QObject::connect(job, &JsonJob::finishedSignal, account.data(), [job, account, spaceId, relPath, context, done, attempt] {
+            if (!context) {
+                return;
+            }
+            const QString actor = job->httpStatusCode() == 200 ? job->data().value("actor"_L1).toString().trimmed() : QString();
+            if (!actor.isEmpty() || attempt >= 2 || job->httpStatusCode() == 403 || job->httpStatusCode() == 401) {
+                done(actor);
+                return;
+            }
+            QTimer::singleShot(40s, context.data(),
+                [account, spaceId, relPath, context, done, attempt] { lookupActorAttempt(account, spaceId, relPath, context, done, attempt + 1); });
+        });
+        job->start();
+    }
+}
+
+void lookupActor(const AccountPtr &account, const QString &spaceId, const QString &relPath, QObject *context, std::function<void(const QString &)> done)
+{
+    if (!account || spaceId.isEmpty() || relPath.isEmpty()) {
+        done({});
+        return;
+    }
+    lookupActorAttempt(account, spaceId, relPath, QPointer<QObject>(context), std::move(done), 0);
 }
 
 } // namespace OCC::Ragrad

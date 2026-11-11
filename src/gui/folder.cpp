@@ -28,6 +28,7 @@
 #include "folderwatcher.h"
 #include "gui/accountsettings.h"
 #include "gui/folderdefinition.h"
+#include "gui/ragradspaces.h"
 #include "guiutility.h"
 #include "libsync/graphapi/spacesmanager.h"
 #include "libsync/vfs/vfs.h"
@@ -544,7 +545,17 @@ void Folder::createGuiLog(const QString &filename, LogStatus status, int count,
         }
 
         if (!text.isEmpty()) {
-            ocApp()->systemNotificationManager()->notify({tr("Sync Activity"), text, Resources::FontIcon(u'')});
+            const QString title = tr("Sync Activity");
+            if (status == LogStatusConflict || status == LogStatusError) {
+                ocApp()->systemNotificationManager()->notify({title, text, Resources::FontIcon(u'')});
+            } else {
+                // Диск Ра Град 4.0.4: в заголовке — кто сделал изменение (по журналу действий Диска): «… · имя сотрудника» или «… · Система»
+                Ragrad::lookupActor(
+                    _accountState->account(), _definition.spaceId(), QDir::fromNativeSeparators(filename), this, [title, text](const QString &actor) {
+                        ocApp()->systemNotificationManager()->notify(
+                            {actor.isEmpty() ? title : u"%1 · %2"_s.arg(title, actor), text, Resources::FontIcon(u'')});
+                    });
+            }
         }
     }
 }

@@ -271,6 +271,44 @@ Pane {
             }
         }
 
+        // ---------- новая версия программы (4.0.4: своё автообновление) ----------
+        Rectangle {
+            id: updateBanner
+            Layout.fillWidth: true
+            Layout.topMargin: 12
+            visible: RagradUpdater.availableVersion !== ""
+            implicitHeight: updateRow.implicitHeight + 24
+            radius: 14
+            color: folderSyncPanel.cPanel
+            Accessible.role: Accessible.StaticText
+            Accessible.name: updateText.text
+
+            RowLayout {
+                id: updateRow
+                anchors.fill: parent
+                anchors.leftMargin: 18
+                anchors.rightMargin: 18
+                spacing: 16
+
+                Label {
+                    id: updateText
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    text: qsTr("Доступна новая версия Диска %1").arg(RagradUpdater.availableVersion)
+                    font.pixelSize: 15
+                    font.weight: Font.DemiBold
+                    color: folderSyncPanel.cText
+                    elide: Text.ElideRight
+                }
+                RagradButton {
+                    Layout.alignment: Qt.AlignVCenter
+                    primary: true
+                    text: qsTr("Обновить")
+                    onClicked: RagradUpdater.installNow()
+                }
+            }
+        }
+
         // ---------- папки ----------
         Label {
             Layout.topMargin: 20

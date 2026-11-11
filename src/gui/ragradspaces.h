@@ -16,6 +16,8 @@
 
 #include "gui/accountstate.h"
 
+#include <functional>
+
 namespace OCC::Ragrad {
 
 /**
@@ -41,5 +43,12 @@ void watchSpaces(const AccountStatePtr &accountState);
  * компьютер». Иначе Проводник продолжает показывать старую папку как «Диск» рядом с новой.
  */
 void clearFolderLabel(const QString &path);
+
+/**
+ * 4.0.4: кто сделал изменение — по журналу действий Диска (сервер отвечает имя сотрудника или «Система»).
+ * done(имя) вызывается один раз; пусто — автор неизвестен. Журнал пополняется раз в минуту, поэтому
+ * при пустом ответе спрашиваем ещё два раза с паузой 40 с.
+ */
+void lookupActor(const AccountPtr &account, const QString &spaceId, const QString &relPath, QObject *context, std::function<void(const QString &)> done);
 
 } // namespace OCC::Ragrad
