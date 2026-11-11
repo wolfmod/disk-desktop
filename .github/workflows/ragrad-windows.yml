@@ -41,7 +41,7 @@ jobs:
         git config --global --add safe.directory '*'
         & $env:CRAFT --setup; if ($LASTEXITCODE) { exit 1 }
         # Рецепты закреплены на версиях, с которыми собираются выпуски: свежие (ноябрь 2026) несовместимы
-        # с закреплённой Craft (.craft.ini, CraftRevision); те же версии — в .craft.shelf (blueprintrepositories url|ветка|ревизия).
+        # с закреплённой Craft (.craft.ini, CraftRevision); те же версии — в .craft.shelf (blueprintrepositories url||ревизия).
         $pins = @{ 'craft-blueprints-kde' = '1c3f91fafd5b5befc87a93c7cec9a92f20efe49e'; 'craft-blueprints-opencloud' = 'c1aefc6ebba5bc49e5ac728344e721cbbb25b2ca' }
         foreach ($name in $pins.Keys) {
           $dirs = @(Get-ChildItem -Path "$home/craft" -Directory -Recurse -Depth 6 -Filter $name -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName '.git') })
