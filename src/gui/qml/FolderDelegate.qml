@@ -133,23 +133,35 @@ Pane {
                     implicitHeight: 46
                     radius: 23
                     color: "#FFFFFF"
+                    // 4.0.6: значок состояния не вращается никогда — раньше вращение останавливалось на случайном угле
+                    // и галочка оставалась повёрнутой и «зубчатой»; крутится только отдельный значок синхронизации.
+                    // Рисуем в 3 раза крупнее и уменьшаем со сглаживанием — края ровные.
                     Image {
                         id: stateIcon
                         anchors.centerIn: parent
                         width: 26
                         height: 26
-                        sourceSize: Qt.size(width, height)
+                        readonly property bool spinning: RagradSyncSummary.state === RagradSyncSummary.Syncing
+                        visible: !spinning
+                        sourceSize: Qt.size(width * 3, height * 3)
+                        smooth: true
+                        mipmap: true
                         source: OCUtils.resourcePath("fontawesome", folderSyncPanel.stateGlyph(RagradSyncSummary.state), true, 0,
                             folderSyncPanel.stateColor(RagradSyncSummary.state))
-
-                        readonly property bool spinning: RagradSyncSummary.state === RagradSyncSummary.Syncing
-                        onSpinningChanged: {
-                            if (!spinning) {
-                                rotation = 0;
-                            }
-                        }
+                    }
+                    Image {
+                        id: spinIcon
+                        anchors.centerIn: parent
+                        width: 26
+                        height: 26
+                        visible: stateIcon.spinning
+                        sourceSize: Qt.size(width * 3, height * 3)
+                        smooth: true
+                        mipmap: true
+                        antialiasing: true
+                        source: OCUtils.resourcePath("fontawesome", folderSyncPanel.stateGlyph(RagradSyncSummary.Syncing), true, 0, folderSyncPanel.cBlue)
                         RotationAnimator on rotation {
-                            running: stateIcon.spinning
+                            running: spinIcon.visible
                             from: 0
                             to: 360
                             duration: 1400
