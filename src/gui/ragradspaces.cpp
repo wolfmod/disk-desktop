@@ -22,10 +22,13 @@
 #include "libsync/vfs/vfs.h"
 
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QLoggingCategory>
 #include <QRegularExpression>
+#include <QUrl>
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -70,6 +73,94 @@ namespace {
     {
         return VfsPluginManager::instance().bestAvailableVfsMode() != Vfs::Mode::Off;
     }
+
+    /// сколько обновлений списка разделов подряд раздела папки нет у движка (путь папки → счётчик)
+    QHash<QString, int> &missingCounts()
+    {
+        static QHash<QString, int> counts;
+        return counts;
+    }
+
+    /// «общие» (открытые человеку папки) не отключаем никогда — их набор меняется сам
+    bool isSharesFolder(Folder *folder)
+    {
+        return QUrl::fromPercentEncoding(folder->webDavUrl().toString().toUtf8()).contains(sharesIdC);
+    }
+
+    /// есть ли в папке что-то, кроме незагруженных заглушек (скачанные или созданные на компьютере файлы)
+    bool hasLocalContent(Folder *folder)
+    {
+        QDirIterator it(folder->path(), QDir::Files | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            const QString file = it.next();
+            const QString name = QFileInfo(file).fileName();
+            if (name.startsWith(".sync_"_L1) || name.compare("Desktop.ini"_L1, Qt::CaseInsensitive) == 0) {
+                continue; // служебные файлы программы
+            }
+            if (!folder->vfs().isDehydratedPlaceholder(file)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+static bool disconnectGoneSpaces(const AccountStatePtr &accountState)
+{
+    if (!accountState->isConnected()) {
+        return false;
+    }
+    auto *spacesManager = accountState->account()->spacesManager();
+    const auto spaces = spacesManager->spaces();
+    // в ответе движка нет ни одного раздела — похоже на сбой, ничего не трогаем
+    if (std::none_of(spaces.cbegin(), spaces.cend(), [](const GraphApi::Space *s) { return !s->disabled() && s->drive().getDriveType() == "project"_L1; })) {
+        return false;
+    }
+
+    QVector<Folder *> gone;
+    int ours = 0;
+    for (Folder *f : FolderMan::instance()->folders()) {
+        if (f->accountState() != accountState || isSharesFolder(f)) {
+            continue;
+        }
+        ++ours;
+        const auto *space = f->space();
+        if (space && !space->disabled()) {
+            missingCounts().remove(f->path());
+            continue;
+        }
+        // раздела нет в двух обновлениях подряд (~30–60 с) — не случайный сбой ответа
+        if (++missingCounts()[f->path()] >= 2) {
+            gone.append(f);
+        }
+    }
+    if (gone.isEmpty()) {
+        return false;
+    }
+    // больше половины папок разом — похоже на сбой, а не на снятые доступы
+    if (gone.size() * 2 > ours) {
+        qCWarning(lcRagradSpaces) << u"пропало слишком много разделов сразу, папки не отключаю:" << gone.size() << u"из" << ours;
+        return false;
+    }
+
+    for (Folder *f : std::as_const(gone)) {
+        const QString path = f->path();
+        const QString name = f->displayName();
+        const bool keepLocal = !f->isReady() || hasLocalContent(f);
+        missingCounts().remove(path);
+        qCInfo(lcRagradSpaces) << u"раздел больше недоступен, отключаю папку" << name << path;
+        FolderMan::instance()->removeFolder(f);
+        if (keepLocal) {
+            // на компьютере есть скачанные или свои файлы — папку оставляем как обычную (без подписи Диска)
+            clearFolderLabel(path);
+            qCInfo(lcRagradSpaces) << u"в папке есть файлы на компьютере — папка оставлена" << path;
+        } else if (QDir(path).removeRecursively()) {
+            qCInfo(lcRagradSpaces) << u"папка без скачанных файлов удалена" << path;
+        } else {
+            qCWarning(lcRagradSpaces) << u"не удалось удалить папку" << path;
+        }
+    }
+    return true;
 }
 
 bool connectSpaces(const AccountStatePtr &accountState, bool useVfs)
@@ -128,7 +219,12 @@ void watchSpaces(const AccountStatePtr &accountState)
         if (!accountState || accountState->isSettingUp() || !accountState->account()->hasDefaultSyncRoot()) {
             return;
         }
+        // 4.0.3: раздел, который человеку больше недоступен (доступ к нему сняли), — отключить, а не показывать ошибку
+        bool changed = disconnectGoneSpaces(accountState);
         if (connectSpaces(accountState, useVfsByDefault())) {
+            changed = true;
+        }
+        if (changed) {
             FolderMan::instance()->scheduleAllFolders();
         }
     });
