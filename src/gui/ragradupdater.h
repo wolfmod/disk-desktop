@@ -58,6 +58,7 @@ private:
     void check();
     void download(const QString &version, const QUrl &url, const QByteArray &sha256);
     void setReady(const QString &version, const QString &file);
+    void showMainWindow();
 
     QNetworkAccessManager *_nam = nullptr;
     QTimer _timer;

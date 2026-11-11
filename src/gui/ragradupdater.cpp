@@ -14,6 +14,8 @@
 
 #include "gui/ragradupdater.h"
 
+#include "gui/settingsdialog.h"
+
 #include "gui/application.h"
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
@@ -180,19 +182,36 @@ void RagradUpdater::setReady(const QString &version, const QString &file)
     Q_EMIT changed();
     qCInfo(lcRagradUpdater) << u"готово обновление" << version << file;
     if (firstTime) {
-        // 4.0.7: в уведомлении Windows — кнопка «Обновить» (как «Отметить прочитанным» у уведомлений Диска)
-        const QString button = tr("Обновить");
-        SystemNotificationRequest request(tr("Доступна новая версия Диска"),
-            tr("Версия %1 загружена. Нажмите «Обновить» — откроется установка новой версии.").arg(version), Resources::FontIcon(u''));
-        request.setButtons({button});
+        // 4.0.7: в уведомлении Windows — кнопки (уведомление с кнопками висит, пока человек не ответит, как уведомления
+        // о разделах с «Отметить прочитанным»). 4.0.8: «Открыть Диск» и щелчок по уведомлению — окно программы
+        // на главной странице, где плашка «Доступна новая версия — Обновить»; «Обновить» — сразу установка.
+        const QString openButton = tr("Открыть Диск");
+        const QString updateButton = tr("Обновить");
+        SystemNotificationRequest request(tr("Доступна новая версия Диска %1").arg(version),
+            tr("Нажмите «Обновить», чтобы установить её, или «Открыть Диск», чтобы посмотреть в окне программы."), Resources::FontIcon(QChar(0xf021)));
+        request.setButtons({updateButton, openButton});
         if (auto *n = ocApp()->systemNotificationManager()->notify(std::move(request))) {
-            connect(n, &SystemNotification::buttonClicked, this, [this, button](const QString &clicked) {
-                if (clicked == button) {
+            connect(n, &SystemNotification::buttonClicked, this, [this, updateButton, openButton](const QString &clicked) {
+                if (clicked == updateButton) {
                     installNow();
+                } else if (clicked == openButton) {
+                    showMainWindow();
+                }
+            });
+            connect(n, &SystemNotification::finished, this, [this](SystemNotification::Result result) {
+                if (result == SystemNotification::Result::Clicked) {
+                    showMainWindow();
                 }
             });
         }
     }
+}
+
+void RagradUpdater::showMainWindow()
+{
+    // главная страница окна — там плашка «Доступна новая версия Диска — Обновить»
+    ocApp()->settingsDialog()->setCurrentPage(SettingsDialog::SettingsPage::Account);
+    ocApp()->showSettings();
 }
 
 void RagradUpdater::installNow()
