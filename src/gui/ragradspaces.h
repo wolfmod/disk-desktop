@@ -18,6 +18,8 @@
 
 #include <functional>
 
+#include <QJsonObject>
+
 namespace OCC::Ragrad {
 
 /**
@@ -45,10 +47,14 @@ void watchSpaces(const AccountStatePtr &accountState);
 void clearFolderLabel(const QString &path);
 
 /**
- * 4.0.4: кто сделал изменение — по журналу действий Диска (сервер отвечает имя сотрудника или «Система»).
- * done(имя) вызывается один раз; пусто — автор неизвестен. Журнал пополняется раз в минуту, поэтому
- * при пустом ответе спрашиваем ещё два раза с паузой 40 с.
+ * Кто и что сделал — по журналу действий Диска (сервер отвечает: actor — имя сотрудника или «Система», action, path,
+ * old_path, parent — событие про папку над файлом). 4.0.4 — только автор; 4.0.9 — ещё и новый путь при переименовании
+ * (targetPath) и само действие для понятного текста. done(ответ) — один раз; пустой объект — не найдено (после двух повторов).
  */
-void lookupActor(const AccountPtr &account, const QString &spaceId, const QString &relPath, QObject *context, std::function<void(const QString &)> done);
+void lookupChange(const AccountPtr &account, const QString &spaceId, const QString &relPath, const QString &targetPath, QObject *context,
+    std::function<void(const QJsonObject &)> done);
+
+/// понятный текст про переименование/перенос папки («Папка «Геодезия» переименована в «Геодезия 2024» (в папке «1028. …»).»); пусто — не про папку
+QString folderChangeText(const QJsonObject &ev);
 
 } // namespace OCC::Ragrad

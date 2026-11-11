@@ -549,11 +549,27 @@ void Folder::createGuiLog(const QString &filename, LogStatus status, int count,
             if (status == LogStatusConflict || status == LogStatusError) {
                 ocApp()->systemNotificationManager()->notify({title, text, Resources::FontIcon(u'')});
             } else {
-                // Диск Ра Град 4.0.4: в заголовке — кто сделал изменение (по журналу действий Диска): «… · имя сотрудника» или «… · Система»
-                Ragrad::lookupActor(
-                    _accountState->account(), _definition.spaceId(), QDir::fromNativeSeparators(filename), this, [title, text](const QString &actor) {
-                        ocApp()->systemNotificationManager()->notify(
-                            {actor.isEmpty() ? title : u"%1 · %2"_s.arg(title, actor), text, Resources::FontIcon(u'')});
+                // Диск Ра Град 4.0.4: в заголовке — кто сделал изменение (по журналу действий Диска): «… · имя сотрудника» или «… · Система».
+                // 4.0.9: у каждого уведомления автор есть всегда (не нашли — так и пишем); переименование/перенос ПАПКИ — понятным
+                // текстом («Папка «Геодезия» переименована в «Геодезия 2024»»), а не «файл внутри переименован сам в себя».
+                const bool renamed = status == LogStatusRename || status == LogStatusMove;
+                const QString target = renamed ? QDir::fromNativeSeparators(renameTarget) : QString();
+                const bool targetIsDir = renamed && QFileInfo(QDir(path()).filePath(target)).isDir();
+                Ragrad::lookupChange(_accountState->account(), _definition.spaceId(), QDir::fromNativeSeparators(filename), target, this,
+                    [title, text, targetIsDir](const QJsonObject &ev) {
+                        QString actor = ev.value("actor"_L1).toString().trimmed();
+                        if (actor.isEmpty()) {
+                            actor = Folder::tr("автор не определён");
+                        }
+                        QString body = text;
+                        const QString action = ev.value("action"_L1).toString();
+                        if ((action == "rename"_L1 || action == "move"_L1) && (ev.value("parent"_L1).toBool() || targetIsDir)) {
+                            const QString folderText = Ragrad::folderChangeText(ev);
+                            if (!folderText.isEmpty()) {
+                                body = folderText;
+                            }
+                        }
+                        ocApp()->systemNotificationManager()->notify({u"%1 · %2"_s.arg(title, actor), body, Resources::FontIcon(QChar(0xf021))});
                     });
             }
         }

@@ -27,6 +27,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QJsonObject>
 #include <QLoggingCategory>
 #include <QPointer>
 #include <QRegularExpression>
@@ -262,35 +263,70 @@ void clearFolderLabel(const QString &path)
 }
 
 namespace {
-    void lookupActorAttempt(const AccountPtr &account, const QString &spaceId, const QString &relPath, QPointer<QObject> context,
-        std::function<void(const QString &)> done, int attempt)
+    void lookupChangeAttempt(const AccountPtr &account, const QString &spaceId, const QString &relPath, const QString &targetPath, QPointer<QObject> context,
+        std::function<void(const QJsonObject &)> done, int attempt)
     {
-        auto *job = new JsonJob(account, account->url(), u"disk-auth/actor"_s, "GET", SimpleNetworkJob::UrlQuery{{u"space"_s, spaceId}, {u"path"_s, relPath}},
-            QNetworkRequest{}, nullptr);
+        SimpleNetworkJob::UrlQuery query{{u"space"_s, spaceId}, {u"path"_s, relPath}};
+        if (!targetPath.isEmpty() && targetPath != relPath) {
+            query.append({u"target"_s, targetPath});
+        }
+        auto *job = new JsonJob(account, account->url(), u"disk-auth/actor"_s, "GET", query, QNetworkRequest{}, nullptr);
         job->setTimeout(15s);
-        QObject::connect(job, &JsonJob::finishedSignal, account.data(), [job, account, spaceId, relPath, context, done, attempt] {
+        QObject::connect(job, &JsonJob::finishedSignal, account.data(), [job, account, spaceId, relPath, targetPath, context, done, attempt] {
             if (!context) {
                 return;
             }
-            const QString actor = job->httpStatusCode() == 200 ? job->data().value("actor"_L1).toString().trimmed() : QString();
-            if (!actor.isEmpty() || attempt >= 2 || job->httpStatusCode() == 403 || job->httpStatusCode() == 401) {
-                done(actor);
+            const QJsonObject ev = job->httpStatusCode() == 200 ? job->data() : QJsonObject();
+            const bool found = !ev.value("actor"_L1).toString().trimmed().isEmpty();
+            // журнал пополняется раз в минуту: пусто — спрашиваем ещё (через 40 и 80 с)
+            if (found || attempt >= 2 || job->httpStatusCode() == 403 || job->httpStatusCode() == 401) {
+                done(found ? ev : QJsonObject());
                 return;
             }
-            QTimer::singleShot(40s, context.data(),
-                [account, spaceId, relPath, context, done, attempt] { lookupActorAttempt(account, spaceId, relPath, context, done, attempt + 1); });
+            QTimer::singleShot(40s, context.data(), [account, spaceId, relPath, targetPath, context, done, attempt] {
+                lookupChangeAttempt(account, spaceId, relPath, targetPath, context, done, attempt + 1);
+            });
         });
         job->start();
     }
+
+    QString lastSegment(const QString &path)
+    {
+        const QString p = QDir::fromNativeSeparators(path);
+        return p.mid(p.lastIndexOf(u'/') + 1);
+    }
 }
 
-void lookupActor(const AccountPtr &account, const QString &spaceId, const QString &relPath, QObject *context, std::function<void(const QString &)> done)
+void lookupChange(const AccountPtr &account, const QString &spaceId, const QString &relPath, const QString &targetPath, QObject *context,
+    std::function<void(const QJsonObject &)> done)
 {
     if (!account || spaceId.isEmpty() || relPath.isEmpty()) {
         done({});
         return;
     }
-    lookupActorAttempt(account, spaceId, relPath, QPointer<QObject>(context), std::move(done), 0);
+    lookupChangeAttempt(account, spaceId, relPath, targetPath, QPointer<QObject>(context), std::move(done), 0);
+}
+
+QString folderChangeText(const QJsonObject &ev)
+{
+    const QString action = ev.value("action"_L1).toString();
+    const QString oldPath = ev.value("old_path"_L1).toString();
+    const QString newPath = ev.value("path"_L1).toString();
+    if (oldPath.isEmpty() || newPath.isEmpty()) {
+        return {};
+    }
+    const QString oldParent = oldPath.contains(u'/') ? oldPath.left(oldPath.lastIndexOf(u'/')) : QString();
+    const QString newParent = newPath.contains(u'/') ? newPath.left(newPath.lastIndexOf(u'/')) : QString();
+    if (action == "rename"_L1) {
+        const QString where = oldParent.isEmpty() ? QString() : QObject::tr(" (в папке «%1»)").arg(lastSegment(oldParent));
+        return QObject::tr("Папка «%1» переименована в «%2»%3.").arg(lastSegment(oldPath), lastSegment(newPath), where);
+    }
+    if (action == "move"_L1) {
+        return QObject::tr("Папка «%1» перемещена из «%2» в «%3».")
+            .arg(lastSegment(newPath), oldParent.isEmpty() ? QObject::tr("корня") : lastSegment(oldParent),
+                newParent.isEmpty() ? QObject::tr("корень") : lastSegment(newParent));
+    }
+    return {};
 }
 
 } // namespace OCC::Ragrad
