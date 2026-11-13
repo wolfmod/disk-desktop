@@ -20,6 +20,7 @@
 #include "gui/folderman.h"
 #include "gui/logbrowser.h"
 #include "gui/networkinformation.h"
+#include "gui/ragradshell.h"
 #include "libsync/configfile.h"
 #include "libsync/platform.h"
 #include "libsync/theme.h"
@@ -88,6 +89,9 @@ struct CommandLineOptions
     bool logDebug = false;
 
     bool debugMode = false;
+
+    // Диск Ра Град 4.0.10: пункт «Скопировать ссылку на Диске» в меню Проводника
+    QString ragradCopyLink;
 };
 
 CommandLineOptions parseOptions(const QStringList &arguments)
@@ -132,6 +136,10 @@ CommandLineOptions parseOptions(const QStringList &arguments)
     auto logDebugOption = addOption({QStringLiteral("logdebug"), QApplication::translate("CommandLine", "Output debug-level messages in the log.")});
     auto debugOption = addOption({QStringLiteral("debug"), QApplication::translate("CommandLine", "Enable debug mode.")});
     addOption({QStringLiteral("cmd"), QApplication::translate("CommandLine", "Forward all arguments to the cmd client. This argument must be the first.")});
+    auto ragradCopyLinkOption =
+        QCommandLineOption{{QStringLiteral("ragrad-copy-link")}, QStringLiteral("Copy a public link to a file or folder in Disk"), QStringLiteral("path")};
+    ragradCopyLinkOption.setFlags(QCommandLineOption::HiddenFromHelp);
+    parser.addOption(ragradCopyLinkOption);
 
     parser.process(arguments);
 
@@ -161,6 +169,9 @@ CommandLineOptions parseOptions(const QStringList &arguments)
     if (parser.isSet(debugOption)) {
         out.logDebug = true;
         out.debugMode = true;
+    }
+    if (parser.isSet(ragradCopyLinkOption)) {
+        out.ragradCopyLink = parser.value(ragradCopyLinkOption);
     }
 
     return out;
@@ -499,6 +510,9 @@ int main(int argc, char **argv)
                 if (options.quitInstance) {
                     qApp->quit();
                 }
+                if (!options.ragradCopyLink.isEmpty()) {
+                    Ragrad::copyPublicLink(options.ragradCopyLink);
+                }
             }
         });
 
@@ -519,6 +533,11 @@ int main(int argc, char **argv)
         if (options.show) {
             ocApp->showSettings();
             // The user explicitly requested the settings dialog, so don't start the new-account wizard.
+        }
+
+        // Диск Ра Град 4.0.10: программу запустили пунктом меню Проводника — ссылка, когда программа подключится к серверу
+        if (!options.ragradCopyLink.isEmpty()) {
+            QTimer::singleShot(0, ocApp.get(), [path = options.ragradCopyLink] { Ragrad::copyPublicLink(path); });
         }
 
         // Display the wizard if we don't have an account yet, and no other UI is showing.

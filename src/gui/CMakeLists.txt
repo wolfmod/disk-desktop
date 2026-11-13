@@ -75,6 +75,7 @@ target_sources(OpenCloudGui PRIVATE
     ragradactivitymodel.cpp
     ragradtexts.cpp
     ragradservicedialogs.cpp
+    ragradshell.cpp
     ragradupdater.cpp
     updateurldialog.cpp
     updatenotifier.cpp

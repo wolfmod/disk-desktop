@@ -30,6 +30,7 @@
 #include "gui/newwizard/setupwizardcontroller.h"
 #include "gui/notifications/systemnotification.h"
 #include "gui/notifications/systemnotificationmanager.h"
+#include "gui/ragradshell.h"
 #include "gui/ragradspaces.h"
 #include "gui/ragradupdater.h"
 #include "gui/systray.h"
@@ -192,6 +193,8 @@ void Application::slotAccountStateAdded(AccountStatePtr accountState) const
     Ragrad::watchSpaces(accountState);
     // Диск Ра Град 4.0.4: своё автообновление (файл версии на сервере Диска)
     RagradUpdater::instance()->start();
+    // Диск Ра Град 4.0.10: пункт «Скопировать ссылку на Диске» в меню Проводника
+    Ragrad::startExplorerMenu();
 
     accountState->checkConnectivity();
 }
