@@ -203,6 +203,18 @@ file(GLOB_RECURSE OPENCLOUD_ICONS "${PROJECT_SOURCE_DIR}/src/resources/theme/col
 file(GLOB_RECURSE OPENCLOUD_SIDEBAR_ICONS "${PROJECT_SOURCE_DIR}/src/resources/theme/colored/*-opencloud-icon-sidebar.png")
 
 ecm_add_app_icon(appIcons ICONS "${OPENCLOUD_ICONS}" SIDEBAR_ICONS "${OPENCLOUD_SIDEBAR_ICONS}" OUTFILE_BASENAME "opencloud")
+if(WIN32)
+    # Disk Ra Grad 4.0.11: chain icon (resource 201) for the "has a public link" mark in the Explorer Status column.
+    # One .rc for both icons: two separate .rc files both number the icon images from 1 and the link fails (CVT1100 duplicate ICON 1).
+    list(FILTER appIcons EXCLUDE REGEX "\\.rc$")
+    set(_ragrad_rc "${CMAKE_CURRENT_BINARY_DIR}/opencloud-ragrad.rc")
+    file(WRITE "${_ragrad_rc}" "IDI_ICON1 ICON DISCARDABLE \"${CMAKE_CURRENT_BINARY_DIR}/opencloud.ico\"
+201 ICON \"${CMAKE_CURRENT_SOURCE_DIR}/ragrad-link.ico\"
+")
+    set_source_files_properties("${_ragrad_rc}" PROPERTIES OBJECT_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/opencloud.ico;${CMAKE_CURRENT_SOURCE_DIR}/ragrad-link.ico")
+    # the .ico itself is a custom command output of ecm_add_app_icon: listing it attaches that command to the target
+    list(APPEND appIcons "${CMAKE_CURRENT_BINARY_DIR}/opencloud.ico" "${_ragrad_rc}")
+endif()
 target_sources(opencloud PRIVATE ${appIcons})
 
 if(NOT APPLE)

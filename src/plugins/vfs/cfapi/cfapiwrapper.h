@@ -91,6 +91,8 @@ namespace CfApiWrapper {
     void registerSyncRoot(const VfsSetupParams &params, const std::function<void(QString)> &callback);
     // void unregisterSyncRootShellExtensions(const QString &providerName, const QString &folderAlias, const QString &accountDisplayName);
     Result<void, QString> unregisterSyncRoot(const VfsSetupParams &params);
+    // Disk Ra Grad 4.0.11: "has a public link" mark (chain icon) in the Explorer Status column - cfapi custom state
+    void setRagradLinkMark(const QString &path, bool isDir, bool on);
 
     Result<CF_CONNECTION_KEY, QString> connectSyncRoot(const std::filesystem::path &path, VfsCfApi *context);
     Result<void, QString> disconnectSyncRoot(CF_CONNECTION_KEY &&key);

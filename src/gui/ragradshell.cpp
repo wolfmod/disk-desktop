@@ -22,22 +22,31 @@
 #include "gui/notifications/systemnotificationmanager.h"
 #include "libsync/account.h"
 #include "libsync/common/syncjournaldb.h"
+#include "libsync/configfile.h"
+#include "libsync/networkjobs/jsonjob.h"
 #include "libsync/networkjobs/simplenetworkjob.h"
+#include "libsync/vfs/vfs.h"
 #include "resources/fonticon.h"
 
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLoggingCategory>
 #include <QNetworkReply>
 #include <QPointer>
 #include <QRegularExpression>
+#include <QSet>
+#include <QSettings>
 #include <QTimer>
 #include <QUrl>
+
+#include <algorithm>
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -146,7 +155,99 @@ namespace {
 #endif
     }
 
-    void requestLink(QPointer<AccountState> state, const QString &itemId, const QString &name, bool isDir, int attempt)
+    // ---- 4.0.11: значок «Есть ссылка» (цепочка) в колонке «Состояние» Проводника ----
+    // Сервер отдаёт id файлов и папок с действующими ссылками для просмотра (GET disk-auth/link-marks, только id, после входа).
+    // Программа находит их в своём журнале и ставит значок; у тех, что были отмечены раньше и пропали из списка, — снимает.
+    // Отмеченные id запоминаются по каждой папке (группа RagradLinkMarks в настройках), чтобы снять значок и после перезапуска.
+    QString linkMarksKey(Folder *folder)
+    {
+        return QString::fromLatin1(QCryptographicHash::hash(folder->path().toUtf8(), QCryptographicHash::Sha1).toHex());
+    }
+
+    /// false — файла с таким id в этой папке нет
+    bool markById(Folder *folder, const QString &id, bool on)
+    {
+        bool found = false;
+        folder->journalDb()->getFileRecordsByFileId(id.toUtf8(), [&](const SyncJournalFileRecord &rec) {
+            if (!rec.isValid() || rec.path().isEmpty()) {
+                return;
+            }
+            found = true;
+            folder->vfs().setRagradLinkMark(rec.path(), rec.isDirectory(), on);
+        });
+        return found;
+    }
+
+    void applyLinkMarks(AccountState *state, const QSet<QString> &ids)
+    {
+        auto settings = ConfigFile::makeQSettings();
+        settings.beginGroup(u"RagradLinkMarks"_s);
+        for (auto *folder : FolderMan::instance()->folders()) {
+            if (folder->accountState().data() != state || !folder->journalDb()) {
+                continue;
+            }
+            const QString key = linkMarksKey(folder);
+            const QStringList prev = settings.value(key).toStringList();
+            QStringList now;
+            for (const QString &id : ids) {
+                if (markById(folder, id, true)) {
+                    now << id;
+                }
+            }
+            int removed = 0;
+            for (const QString &id : prev) {
+                if (!ids.contains(id) && markById(folder, id, false)) {
+                    ++removed;
+                }
+            }
+            now.sort();
+            if (now != prev) {
+                qCInfo(lcRagradShell) << u"значки ссылок" << folder->path() << u"отмечено" << now.size() << u"снято" << removed;
+            }
+            settings.setValue(key, now);
+        }
+    }
+
+    void refreshLinkMarks()
+    {
+        QList<QPointer<AccountState>> states;
+        for (auto *folder : FolderMan::instance()->folders()) {
+            AccountState *st = folder->accountState().data();
+            if (st && std::none_of(states.cbegin(), states.cend(), [st](const QPointer<AccountState> &x) { return x.data() == st; })) {
+                states << QPointer<AccountState>(st);
+            }
+        }
+        for (const auto &st : states) {
+            if (!st || !st->isConnected()) {
+                continue;
+            }
+            const AccountPtr account = st->account();
+            auto *job = new JsonJob(account, account->url(), u"disk-auth/link-marks"_s, "GET", SimpleNetworkJob::UrlQuery{}, QNetworkRequest{}, nullptr);
+            job->setTimeout(30s);
+            QObject::connect(job, &JsonJob::finishedSignal, qApp, [job, st] {
+                if (!st) {
+                    return;
+                }
+                if (job->httpStatusCode() != 200) {
+                    qCInfo(lcRagradShell) << u"список ссылок не получен" << job->httpStatusCode();
+                    return;
+                }
+                QSet<QString> ids;
+                const QJsonArray items = job->data().value("items"_L1).toArray();
+                for (const auto &v : items) {
+                    const QString id = v.toString();
+                    if (itemIdRe().match(id).hasMatch()) {
+                        ids.insert(id);
+                    }
+                }
+                applyLinkMarks(st.data(), ids);
+            });
+            job->start();
+        }
+    }
+
+    void requestLink(
+        QPointer<AccountState> state, QPointer<Folder> folder, const QString &relPath, const QString &itemId, const QString &name, bool isDir, int attempt)
     {
         if (!state) {
             notify(failTitle(), QObject::tr("Нет связи с сервером Диска. Повторите попытку позже."));
@@ -158,7 +259,8 @@ namespace {
                 notify(failTitle(), QObject::tr("Нет связи с сервером Диска. Проверьте подключение к интернету и повторите."));
                 return;
             }
-            QTimer::singleShot(2s, qApp, [state, itemId, name, isDir, attempt] { requestLink(state, itemId, name, isDir, attempt + 1); });
+            QTimer::singleShot(
+                2s, qApp, [state, folder, relPath, itemId, name, isDir, attempt] { requestLink(state, folder, relPath, itemId, name, isDir, attempt + 1); });
             return;
         }
         const AccountPtr account = state->account();
@@ -167,7 +269,7 @@ namespace {
         auto *job = new SimpleNetworkJob(account, account->url(), u"graph/v1beta1/drives/%1/items/%2/createLink"_s.arg(drive, itemId), "POST",
             QJsonObject{{u"type"_s, u"view"_s}}, QNetworkRequest{}, nullptr);
         job->setTimeout(60s);
-        QObject::connect(job, &SimpleNetworkJob::finishedSignal, qApp, [job, account, name, isDir] {
+        QObject::connect(job, &SimpleNetworkJob::finishedSignal, qApp, [job, account, folder, relPath, name, isDir] {
             const QJsonObject data = job->reply() ? QJsonDocument::fromJson(job->reply()->readAll()).object() : QJsonObject();
             const QString webUrl = data.value("link"_L1).toObject().value("webUrl"_L1).toString();
             const QString token = webUrl.section(u'/', -1, -1, QString::SectionSkipEmpty);
@@ -177,6 +279,11 @@ namespace {
                 link.setQuery(QString());
                 link.setFragment(QString());
                 QGuiApplication::clipboard()->setText(link.toString());
+                // значок «Есть ссылка» сразу; список с сервера подтвердит его, когда журнал Диска запишет ссылку (раз в минуту)
+                if (folder) {
+                    folder->vfs().setRagradLinkMark(relPath, isDir, true);
+                }
+                QTimer::singleShot(75s, qApp, [] { refreshLinkMarks(); });
                 qCInfo(lcRagradShell) << u"ссылка скопирована" << name;
                 notify(QObject::tr("Ссылка скопирована"),
                     (isDir ? QObject::tr("Ссылка на папку «%1» скопирована. Любой, у кого она есть, сможет открыть и скачать файлы.")
@@ -203,6 +310,13 @@ void startExplorerMenu()
     started = true;
     updateExplorerMenu();
     QObject::connect(FolderMan::instance(), &FolderMan::folderListChanged, qApp, [] { updateExplorerMenu(); });
+
+    // 4.0.11: значок «Есть ссылка» — сверка со списком ссылок раз в 5 минут (первая — через 45 с после запуска)
+    auto *linkMarksTimer = new QTimer(qApp);
+    linkMarksTimer->setInterval(5min);
+    QObject::connect(linkMarksTimer, &QTimer::timeout, qApp, [] { refreshLinkMarks(); });
+    linkMarksTimer->start();
+    QTimer::singleShot(45s, qApp, [] { refreshLinkMarks(); });
 }
 
 void copyPublicLink(const QString &localPath)
@@ -229,7 +343,7 @@ void copyPublicLink(const QString &localPath)
                 .arg(name));
         return;
     }
-    requestLink(QPointer<AccountState>(folder->accountState().data()), itemId, name, record.isDirectory(), 0);
+    requestLink(QPointer<AccountState>(folder->accountState().data()), QPointer<Folder>(folder), relPath, itemId, name, record.isDirectory(), 0);
 }
 
 }

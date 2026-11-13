@@ -281,6 +281,11 @@ bool VfsCfApi::setPinState(const QString &folderPath, PinState state)
     return static_cast<bool>(cfapi::setPinState(handle, state, cfapi::Recurse));
 }
 
+void VfsCfApi::setRagradLinkMark(const QString &relFilePath, bool isDir, bool on)
+{
+    cfapi::setRagradLinkMark(params().filesystemPath() + relFilePath, isDir, on);
+}
+
 Optional<PinState> VfsCfApi::pinState(const QString &folderPath)
 {
     const auto localPath = params().root() / folderPath;

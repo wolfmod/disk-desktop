@@ -25,6 +25,7 @@
 #include <ntstatus.h>
 #include <sddl.h>
 
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Security.Cryptography.h>
 #include <winrt/windows.Storage.Streams.h>
@@ -343,6 +344,65 @@ QString createSyncRootID(const QString &providerName, const QUuid &accountUUID, 
     return u"%1!%2!%3!%4"_s.arg(providerName, windowsSid, accountUUID.toString(QUuid::WithoutBraces), stableFolderHash);
 }
 
+namespace {
+// Диск Ра Град 4.0.11: id состояния «Есть ссылка» — один и тот же в регистрации папки и у файлов; значок — ресурс 201 в opencloud.exe
+constexpr int ragradLinkMarkId = 1;
+QString ragradLinkIcon()
+{
+    return QDir::toNativeSeparators(QCoreApplication::applicationFilePath()) + u",-201"_s;
+}
+}
+
+void OCC::CfApiWrapper::setRagradLinkMark(const QString &path, bool isDir, bool on)
+{
+    const QString nativePath = QDir::toNativeSeparators(path);
+    auto apply = [nativePath, on](const winrt::IStorageItem &item) {
+        auto props = winrt::single_threaded_vector<winrt::StorageProviderItemProperty>();
+        if (on) {
+            winrt::StorageProviderItemProperty prop;
+            prop.Id(ragradLinkMarkId);
+            const QString value = u"Есть ссылка для просмотра"_s;
+            prop.Value(reinterpret_cast<const wchar_t *>(value.utf16()));
+            const QString icon = ragradLinkIcon();
+            prop.IconResource(reinterpret_cast<const wchar_t *>(icon.utf16()));
+            props.Append(prop);
+        }
+        // пустой список снимает значок
+        winrt::StorageProviderItemProperties::SetAsync(item, props).Completed([nativePath, on](const winrt::IAsyncAction &, winrt::AsyncStatus status) {
+            if (status != winrt::AsyncStatus::Completed) {
+                qCWarning(lcCfApiWrapper) << u"link mark not applied" << nativePath << on;
+            }
+        });
+    };
+    auto guarded = [apply, nativePath](auto &&getItem) {
+        try {
+            apply(getItem());
+        } catch (const winrt::hresult_error &ex) {
+            qCWarning(lcCfApiWrapper) << u"link mark failed" << nativePath << Utility::formatWinError(ex.code());
+        }
+    };
+    try {
+        const auto wpath = reinterpret_cast<const wchar_t *>(nativePath.utf16());
+        if (isDir) {
+            winrt::StorageFolder::GetFolderFromPathAsync(wpath).Completed(
+                [guarded](const winrt::IAsyncOperation<winrt::StorageFolder> &op, winrt::AsyncStatus status) {
+                    if (status == winrt::AsyncStatus::Completed) {
+                        guarded([&op] { return winrt::IStorageItem(op.GetResults()); });
+                    }
+                });
+        } else {
+            winrt::StorageFile::GetFileFromPathAsync(wpath).Completed(
+                [guarded](const winrt::IAsyncOperation<winrt::StorageFile> &op, winrt::AsyncStatus status) {
+                    if (status == winrt::AsyncStatus::Completed) {
+                        guarded([&op] { return winrt::IStorageItem(op.GetResults()); });
+                    }
+                });
+        }
+    } catch (const winrt::hresult_error &ex) {
+        qCWarning(lcCfApiWrapper) << u"link mark failed" << nativePath << Utility::formatWinError(ex.code());
+    }
+}
+
 void OCC::CfApiWrapper::registerSyncRoot(const VfsSetupParams &params, const std::function<void(QString)> &callback)
 {
     const auto nativePath = QDir::toNativeSeparators(params.filesystemPath());
@@ -383,6 +443,13 @@ void OCC::CfApiWrapper::registerSyncRoot(const VfsSetupParams &params, const std
                 const QString recycleBinUrl = webDisk + u"app/"_s;
                 winrt::Uri uri(reinterpret_cast<const wchar_t *>(recycleBinUrl.utf16()));
                 info.RecycleBinUri(uri);
+
+                // Диск Ра Град 4.0.11: состояние «Есть ссылка» — значок цепочки в колонке «Состояние» Проводника (ставит setRagradLinkMark)
+                winrt::StorageProviderItemPropertyDefinition linkDef;
+                linkDef.Id(ragradLinkMarkId);
+                const QString linkDefName = u"Ссылка"_s;
+                linkDef.DisplayNameResource(reinterpret_cast<const wchar_t *>(linkDefName.utf16()));
+                info.StorageProviderItemPropertyDefinitions().Append(linkDef);
 
                 winrt::Streams::DataWriter streamWriter;
                 streamWriter.WriteString(params.account->uuid().toString().toStdWString());

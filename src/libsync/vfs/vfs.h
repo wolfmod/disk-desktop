@@ -197,6 +197,17 @@ public:
      */
     [[nodiscard]] virtual AvailabilityResult availability(const QString &folderPath) = 0;
 
+    /** Disk Ra Grad 4.0.11: "has a public link" mark in the Explorer Status column (Windows cfapi only; others do nothing).
+     *
+     * relFilePath is relative to the sync folder.
+     */
+    virtual void setRagradLinkMark(const QString &relFilePath, bool isDir, bool on)
+    {
+        Q_UNUSED(relFilePath)
+        Q_UNUSED(isDir)
+        Q_UNUSED(on)
+    }
+
     /** Removes all virtual file db entries and dehydrated local placeholders.
      *
      * Particularly useful when switching off vfs mode or switching to a

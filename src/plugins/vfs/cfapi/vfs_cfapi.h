@@ -60,6 +60,8 @@ public:
 
     LocalInfo statTypeVirtualFile(LocalInfo &&fileInfo) override;
 
+    void setRagradLinkMark(const QString &relFilePath, bool isDir, bool on) override;
+
 public Q_SLOTS:
     void fileStatusChanged(const QString &systemFileName, OCC::SyncFileStatus fileStatus) override;
 
