@@ -7,6 +7,7 @@ if (WIN32)
         LIBS
             cldapi
             WindowsApp
+            shell32
     )
 
 endif()

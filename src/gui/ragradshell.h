@@ -35,4 +35,9 @@ OPENCLOUD_GUI_EXPORT void startExplorerMenu();
  */
 OPENCLOUD_GUI_EXPORT void copyPublicLink(const QString &localPath);
 
+/**
+ * 4.0.12: «Удалить ссылку на Диске» — пункт меню Проводника только у файлов и папок со значком ссылки. После подтверждения сервер (tech)
+ * закрывает все ссылки для просмотра у файла (права — как на создание), значок и пункт убираются сразу.
+ */
+OPENCLOUD_GUI_EXPORT void removePublicLink(const QString &localPath);
 }

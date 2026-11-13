@@ -24,6 +24,7 @@
 #include <comdef.h>
 #include <ntstatus.h>
 #include <sddl.h>
+#include <shlobj.h>
 
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.h>
@@ -371,7 +372,10 @@ void OCC::CfApiWrapper::setRagradLinkMark(const QString &path, bool isDir, bool 
         winrt::StorageProviderItemProperties::SetAsync(item, props).Completed([nativePath, on](const winrt::IAsyncAction &, winrt::AsyncStatus status) {
             if (status != winrt::AsyncStatus::Completed) {
                 qCWarning(lcCfApiWrapper) << u"link mark not applied" << nativePath << on;
+                return;
             }
+            // Explorer does not repaint the Status column by itself (the mark changed only after F5) - tell it the item changed
+            SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSHNOWAIT, reinterpret_cast<const wchar_t *>(nativePath.utf16()), nullptr);
         });
     };
     auto guarded = [apply, nativePath](auto &&getItem) {

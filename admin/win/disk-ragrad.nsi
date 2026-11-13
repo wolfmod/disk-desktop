@@ -336,6 +336,8 @@ DeleteRegKey SHCTX "${regkey}"
 ; пункт «Скопировать ссылку на Диске» в меню Проводника (его записывает сама программа)
 DeleteRegKey HKCU "Software\Classes\*\shell\RagradDiskCopyLink"
 DeleteRegKey HKCU "Software\Classes\Directory\shell\RagradDiskCopyLink"
+DeleteRegKey HKCU "Software\Classes\*\shell\RagradDiskRemoveLink"
+DeleteRegKey HKCU "Software\Classes\Directory\shell\RagradDiskRemoveLink"
 
 Delete "$SMPROGRAMS\@{ragrad_display_name}.lnk"
 

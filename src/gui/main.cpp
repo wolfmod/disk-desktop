@@ -92,6 +92,8 @@ struct CommandLineOptions
 
     // Диск Ра Град 4.0.10: пункт «Скопировать ссылку на Диске» в меню Проводника
     QString ragradCopyLink;
+    // 4.0.12: «Удалить ссылку на Диске»
+    QString ragradRemoveLink;
 };
 
 CommandLineOptions parseOptions(const QStringList &arguments)
@@ -140,6 +142,10 @@ CommandLineOptions parseOptions(const QStringList &arguments)
         QCommandLineOption{{QStringLiteral("ragrad-copy-link")}, QStringLiteral("Copy a public link to a file or folder in Disk"), QStringLiteral("path")};
     ragradCopyLinkOption.setFlags(QCommandLineOption::HiddenFromHelp);
     parser.addOption(ragradCopyLinkOption);
+    auto ragradRemoveLinkOption =
+        QCommandLineOption{{QStringLiteral("ragrad-remove-link")}, QStringLiteral("Remove public links of a file or folder in Disk"), QStringLiteral("path")};
+    ragradRemoveLinkOption.setFlags(QCommandLineOption::HiddenFromHelp);
+    parser.addOption(ragradRemoveLinkOption);
 
     parser.process(arguments);
 
@@ -172,6 +178,9 @@ CommandLineOptions parseOptions(const QStringList &arguments)
     }
     if (parser.isSet(ragradCopyLinkOption)) {
         out.ragradCopyLink = parser.value(ragradCopyLinkOption);
+    }
+    if (parser.isSet(ragradRemoveLinkOption)) {
+        out.ragradRemoveLink = parser.value(ragradRemoveLinkOption);
     }
 
     return out;
@@ -455,6 +464,10 @@ int main(int argc, char **argv)
 
             QStringList args = app.arguments();
             if (args.size() > 1) {
+#ifdef Q_OS_WIN
+                // Диск Ра Град 4.0.12: окно «Удалить ссылку?» работающей программы — поверх Проводника
+                AllowSetForegroundWindow(ASFW_ANY);
+#endif
                 QString msg = args.join(QLatin1String("|"));
                 if (!singleApplication.sendMessage((msgParseOptionsC() + msg).toUtf8()))
                     return -1;
@@ -513,6 +526,9 @@ int main(int argc, char **argv)
                 if (!options.ragradCopyLink.isEmpty()) {
                     Ragrad::copyPublicLink(options.ragradCopyLink);
                 }
+                if (!options.ragradRemoveLink.isEmpty()) {
+                    Ragrad::removePublicLink(options.ragradRemoveLink);
+                }
             }
         });
 
@@ -538,6 +554,9 @@ int main(int argc, char **argv)
         // Диск Ра Град 4.0.10: программу запустили пунктом меню Проводника — ссылка, когда программа подключится к серверу
         if (!options.ragradCopyLink.isEmpty()) {
             QTimer::singleShot(0, ocApp.get(), [path = options.ragradCopyLink] { Ragrad::copyPublicLink(path); });
+        }
+        if (!options.ragradRemoveLink.isEmpty()) {
+            QTimer::singleShot(0, ocApp.get(), [path = options.ragradRemoveLink] { Ragrad::removePublicLink(path); });
         }
 
         // Display the wizard if we don't have an account yet, and no other UI is showing.

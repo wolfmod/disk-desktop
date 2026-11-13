@@ -31,6 +31,7 @@
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -38,8 +39,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLoggingCategory>
+#include <QMessageBox>
 #include <QNetworkReply>
 #include <QPointer>
+#include <QPushButton>
 #include <QRegularExpression>
 #include <QSet>
 #include <QSettings>
@@ -102,12 +105,16 @@ namespace {
     {
         const std::wstring k = key.toStdWString();
         const std::wstring n = name.toStdWString();
-        wchar_t buf[8192];
-        DWORD size = sizeof(buf);
-        if (RegGetValueW(HKEY_CURRENT_USER, k.c_str(), name.isEmpty() ? nullptr : n.c_str(), RRF_RT_REG_SZ, nullptr, buf, &size) != ERROR_SUCCESS) {
+        const wchar_t *valueName = name.isEmpty() ? nullptr : n.c_str();
+        DWORD size = 0;
+        if (RegGetValueW(HKEY_CURRENT_USER, k.c_str(), valueName, RRF_RT_REG_SZ, nullptr, nullptr, &size) != ERROR_SUCCESS || size == 0) {
             return {};
         }
-        return QString::fromWCharArray(buf);
+        std::wstring buf(size / sizeof(wchar_t) + 1, L'\0');
+        if (RegGetValueW(HKEY_CURRENT_USER, k.c_str(), valueName, RRF_RT_REG_SZ, nullptr, buf.data(), &size) != ERROR_SUCCESS) {
+            return {};
+        }
+        return QString::fromWCharArray(buf.c_str());
     }
 
     void removeKey(const QString &key)
@@ -164,8 +171,62 @@ namespace {
         return QString::fromLatin1(QCryptographicHash::hash(folder->path().toUtf8(), QCryptographicHash::Sha1).toHex());
     }
 
-    /// false — файла с таким id в этой папке нет
-    bool markById(Folder *folder, const QString &id, bool on)
+    /// 4.0.12: отмеченные значком файлы и папки (полные пути) по каждой папке Диска — из них условие пункта «Удалить ссылку на Диске»
+    QHash<QString, QSet<QString>> &markedPaths()
+    {
+        static QHash<QString, QSet<QString>> paths;
+        return paths;
+    }
+
+    /// 4.0.12: только что удалённые ссылки — журнал Диска узнаёт об удалении через минуту, до этого список сервера ещё со ссылкой
+    QHash<QString, QDateTime> &recentlyRemoved()
+    {
+        static QHash<QString, QDateTime> ids;
+        return ids;
+    }
+
+    QString fullPath(Folder *folder, const QString &relPath)
+    {
+        return QDir::toNativeSeparators(QDir::cleanPath(folder->path() + u'/' + relPath));
+    }
+
+    /// пункт «Удалить ссылку на Диске»: только у отмеченных значком (условие — точные пути); отмеченных нет — пункта нет
+    void updateRemoveLinkMenu()
+    {
+#ifdef Q_OS_WIN
+        QStringList conditions;
+        for (const auto &set : std::as_const(markedPaths())) {
+            for (const QString &path : set) {
+                if (!path.contains(u'"')) {
+                    conditions << u"System.ParsingPath:=\"%1\""_s.arg(path);
+                }
+            }
+        }
+        conditions.removeDuplicates();
+        conditions.sort();
+        const QString exe = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
+        const QString appliesTo = conditions.join(u" OR "_s);
+        const QString command = u"\"%1\" --ragrad-remove-link \"%2\""_s.arg(exe, u"%1"_s);
+        for (const QString &cls : {u"*"_s, u"Directory"_s}) {
+            const QString key = u"Software\\Classes\\%1\\shell\\RagradDiskRemoveLink"_s.arg(cls);
+            if (conditions.isEmpty()) {
+                removeKey(key);
+                continue;
+            }
+            if (value(key, u"AppliesTo"_s) == appliesTo && value(key + u"\\command"_s, {}) == command) {
+                continue;
+            }
+            setValue(key, u"MUIVerb"_s, QObject::tr("Удалить ссылку на Диске"));
+            setValue(key, u"Icon"_s, u"\"%1\",0"_s.arg(exe));
+            setValue(key, u"AppliesTo"_s, appliesTo);
+            setValue(key, u"MultiSelectModel"_s, u"Single"_s);
+            setValue(key + u"\\command"_s, {}, command);
+        }
+#endif
+    }
+
+    /// false — файла с таким id в этой папке нет; localPath — его полный путь
+    bool markById(Folder *folder, const QString &id, bool on, QString *localPath = nullptr)
     {
         bool found = false;
         folder->journalDb()->getFileRecordsByFileId(id.toUtf8(), [&](const SyncJournalFileRecord &rec) {
@@ -174,6 +235,9 @@ namespace {
             }
             found = true;
             folder->vfs().setRagradLinkMark(rec.path(), rec.isDirectory(), on);
+            if (localPath) {
+                *localPath = fullPath(folder, rec.path());
+            }
         });
         return found;
     }
@@ -189,11 +253,15 @@ namespace {
             const QString key = linkMarksKey(folder);
             const QStringList prev = settings.value(key).toStringList();
             QStringList now;
+            QSet<QString> paths;
             for (const QString &id : ids) {
-                if (markById(folder, id, true)) {
+                QString path;
+                if (markById(folder, id, true, &path)) {
                     now << id;
+                    paths.insert(path);
                 }
             }
+            markedPaths().insert(key, paths);
             int removed = 0;
             for (const QString &id : prev) {
                 if (!ids.contains(id) && markById(folder, id, false)) {
@@ -206,6 +274,7 @@ namespace {
             }
             settings.setValue(key, now);
         }
+        updateRemoveLinkMenu();
     }
 
     void refreshLinkMarks()
@@ -234,9 +303,13 @@ namespace {
                 }
                 QSet<QString> ids;
                 const QJsonArray items = job->data().value("items"_L1).toArray();
+                const QDateTime fresh = QDateTime::currentDateTimeUtc().addSecs(-180);
+                for (auto it = recentlyRemoved().begin(); it != recentlyRemoved().end();) {
+                    it = it.value() < fresh ? recentlyRemoved().erase(it) : std::next(it);
+                }
                 for (const auto &v : items) {
                     const QString id = v.toString();
-                    if (itemIdRe().match(id).hasMatch()) {
+                    if (itemIdRe().match(id).hasMatch() && !recentlyRemoved().contains(id)) {
                         ids.insert(id);
                     }
                 }
@@ -282,6 +355,8 @@ namespace {
                 // значок «Есть ссылка» сразу; список с сервера подтвердит его, когда журнал Диска запишет ссылку (раз в минуту)
                 if (folder) {
                     folder->vfs().setRagradLinkMark(relPath, isDir, true);
+                    markedPaths()[linkMarksKey(folder)].insert(fullPath(folder, relPath));
+                    updateRemoveLinkMenu();
                 }
                 QTimer::singleShot(75s, qApp, [] { refreshLinkMarks(); });
                 qCInfo(lcRagradShell) << u"ссылка скопирована" << name;
@@ -296,6 +371,56 @@ namespace {
             static const QRegularExpression cyr(u"[А-Яа-яЁё]"_s);
             qCWarning(lcRagradShell) << u"ссылка не создана" << name << job->httpStatusCode() << message;
             notify(failTitle(), cyr.match(message).hasMatch() ? message : QObject::tr("Не удалось создать ссылку. Повторите попытку позже."));
+        });
+        job->start();
+    }
+
+    QString removeFailTitle()
+    {
+        return QObject::tr("Ссылка не удалена");
+    }
+
+    void requestRemove(
+        QPointer<AccountState> state, QPointer<Folder> folder, const QString &relPath, const QString &itemId, const QString &name, bool isDir, int attempt)
+    {
+        if (!state) {
+            notify(removeFailTitle(), QObject::tr("Нет связи с сервером Диска. Повторите попытку позже."));
+            return;
+        }
+        if (!state->isConnected()) {
+            if (attempt >= 30) {
+                notify(removeFailTitle(), QObject::tr("Нет связи с сервером Диска. Проверьте подключение к интернету и повторите."));
+                return;
+            }
+            QTimer::singleShot(
+                2s, qApp, [state, folder, relPath, itemId, name, isDir, attempt] { requestRemove(state, folder, relPath, itemId, name, isDir, attempt + 1); });
+            return;
+        }
+        const AccountPtr account = state->account();
+        // все ссылки у файла (кто бы их ни создал), права — как на создание: сервер tech, тот же вход программы
+        auto *job = new SimpleNetworkJob(
+            account, account->url(), u"disk-auth/links/remove-item"_s, "POST", QJsonObject{{u"item"_s, itemId}}, QNetworkRequest{}, nullptr);
+        job->setTimeout(60s);
+        QObject::connect(job, &SimpleNetworkJob::finishedSignal, qApp, [job, folder, relPath, itemId, name, isDir] {
+            const QJsonObject data = job->reply() ? QJsonDocument::fromJson(job->reply()->readAll()).object() : QJsonObject();
+            if (job->httpStatusCode() == 200 && data.value("ok"_L1).toBool()) {
+                recentlyRemoved().insert(itemId, QDateTime::currentDateTimeUtc());
+                if (folder) {
+                    folder->vfs().setRagradLinkMark(relPath, isDir, false);
+                    markedPaths()[linkMarksKey(folder)].remove(fullPath(folder, relPath));
+                    updateRemoveLinkMenu();
+                }
+                qCInfo(lcRagradShell) << u"ссылка удалена" << name << data.value("removed"_L1).toInt();
+                notify(QObject::tr("Ссылка удалена"),
+                    (isDir ? QObject::tr("Ссылка на папку «%1» удалена. По ней больше нельзя открыть папку.")
+                           : QObject::tr("Ссылка на файл «%1» удалена. По ней больше нельзя открыть файл."))
+                        .arg(name));
+                return;
+            }
+            const QString message = data.value("error"_L1).toObject().value("message"_L1).toString();
+            static const QRegularExpression cyr(u"[А-Яа-яЁё]"_s);
+            qCWarning(lcRagradShell) << u"ссылка не удалена" << name << job->httpStatusCode() << message;
+            notify(removeFailTitle(), cyr.match(message).hasMatch() ? message : QObject::tr("Не удалось удалить ссылку. Повторите попытку позже."));
         });
         job->start();
     }
@@ -346,4 +471,44 @@ void copyPublicLink(const QString &localPath)
     requestLink(QPointer<AccountState>(folder->accountState().data()), QPointer<Folder>(folder), relPath, itemId, name, record.isDirectory(), 0);
 }
 
+void removePublicLink(const QString &localPath)
+{
+    const QString clean = QDir::cleanPath(QDir::fromNativeSeparators(localPath));
+    const QFileInfo info(clean);
+    const QString name = info.fileName();
+    QString relPath;
+    Folder *folder = FolderMan::instance()->folderForPath(clean, &relPath);
+    if (!folder || relPath.isEmpty()) {
+        notify(removeFailTitle(), QObject::tr("«%1» не находится в папке Диска.").arg(name));
+        return;
+    }
+    const auto record = folder->journalDb()->getFileRecord(relPath);
+    const QString itemId = QString::fromUtf8(record.fileId());
+    if (!record.isValid() || !itemIdRe().match(itemId).hasMatch()) {
+        notify(removeFailTitle(), QObject::tr("Сведения о «%1» ещё не получены. Дождитесь окончания синхронизации и повторите.").arg(name));
+        return;
+    }
+    const bool isDir = record.isDirectory();
+    // удаление необратимо (новая ссылка будет другой) — спрашиваем, как на сайте
+    auto *box = new QMessageBox(QMessageBox::Question, QObject::tr("Удалить ссылку?"),
+        (isDir ? QObject::tr("Удалить ссылку на папку «%1»? Все, кому её отправили, больше не смогут открыть папку по этой ссылке.")
+               : QObject::tr("Удалить ссылку на файл «%1»? Все, кому её отправили, больше не смогут открыть файл по этой ссылке."))
+            .arg(name),
+        QMessageBox::NoButton, nullptr);
+    QPushButton *yes = box->addButton(QObject::tr("Удалить ссылку"), QMessageBox::AcceptRole);
+    QPushButton *no = box->addButton(QObject::tr("Отмена"), QMessageBox::RejectRole);
+    box->setDefaultButton(no);
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->setWindowFlag(Qt::WindowStaysOnTopHint);
+    QPointer<AccountState> state(folder->accountState().data());
+    QPointer<Folder> folderPtr(folder);
+    QObject::connect(box, &QMessageBox::finished, qApp, [box, yes, state, folderPtr, relPath, itemId, name, isDir] {
+        if (box->clickedButton() == yes) {
+            requestRemove(state, folderPtr, relPath, itemId, name, isDir, 0);
+        }
+    });
+    box->show();
+    box->raise();
+    box->activateWindow();
+}
 }
